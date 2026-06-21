@@ -20,7 +20,7 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 DIRECT_URL="postgresql://USER:PASSWORD@DIRECT_HOST:5432/DATABASE?sslmode=require"
 ```
 
-For a fast hosted option, create a Neon or Supabase Postgres database and paste its connection strings into `.env`. With Supabase, use the pooled connection string for `DATABASE_URL` and the direct connection string for `DIRECT_URL`.
+For a fast hosted option, create a Neon or Supabase Postgres database and paste its connection strings into `.env`. With Supabase, use the transaction pooler connection string for `DATABASE_URL`. Use the direct connection string for `DIRECT_URL`; if Vercel cannot reach the direct host, use Supabase's session pooler connection string for `DIRECT_URL`.
 
 ## Autofix PR flow
 
@@ -69,4 +69,4 @@ Then configure a Project in PersonaProbe with:
 
 ## Deployment note
 
-Vercel can host the Next.js app. Add `DATABASE_URL` and `DIRECT_URL` in Vercel before deploying for a working app. During `npm run build`, PersonaProbe runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured.
+Vercel can host the Next.js app. Add `DATABASE_URL` and `DIRECT_URL` in Vercel before deploying for a working app. During `npm run build`, PersonaProbe runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured. If Supabase's direct host is unreachable from Vercel, the build script retries migrations through the Supabase session pooler derived from `DATABASE_URL`.
