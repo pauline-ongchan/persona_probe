@@ -53,6 +53,17 @@ const personas = [
   }
 ];
 
+const targetProject = {
+  name: "User Persona Test Website",
+  targetUrl: "https://userpersonatestwebsite.vercel.app/demo-app/account-settings",
+  githubOwner: "pauline-ongchan",
+  githubRepo: "userpersonatestwebsite",
+  baseBranch: "main",
+  autofixWorkflow: "personaprobe-autofix.yml",
+  sentryOrg: null,
+  sentryProject: null
+};
+
 async function main() {
   await prisma.persona.deleteMany({
     where: {
@@ -67,6 +78,24 @@ async function main() {
       where: { key: persona.key },
       update: persona,
       create: persona
+    });
+  }
+
+  const existingProject = await prisma.project.findFirst({
+    where: {
+      githubOwner: targetProject.githubOwner,
+      githubRepo: targetProject.githubRepo
+    }
+  });
+
+  if (existingProject) {
+    await prisma.project.update({
+      where: { id: existingProject.id },
+      data: targetProject
+    });
+  } else {
+    await prisma.project.create({
+      data: targetProject
     });
   }
 }
