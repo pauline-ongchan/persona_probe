@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "node scripts/prepare-database.mjs && next build",
     "start": "next start",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "postinstall": "prisma generate",
     "lint": "eslint . --max-warnings=0",
     "prisma:generate": "prisma generate",
