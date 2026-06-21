@@ -307,7 +307,7 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
           durationMs: Date.now() - startedAt,
           agentSummary: oracleResult.passed
             ? "The persona-conditioned agent completed the task according to the configured oracle."
-            : summarizeFailureCategory(failureCategory),
+            : summarizeFailureCategory(failureCategory, input.persona.key, input.mode),
           finalUrl,
           finalTextSample,
           screenshotUrl,
@@ -915,7 +915,10 @@ function containsInfraSignal(value: string) {
   ].some((signal) => value.includes(signal));
 }
 
-function summarizeFailureCategory(category: FailureCategory | null) {
+function summarizeFailureCategory(category: FailureCategory | null, personaKey?: string, mode?: RunMode) {
+  const personaSummary = summarizePersonaFailureCategory(category, personaKey, mode);
+  if (personaSummary) return personaSummary;
+
   if (category === "PERSONA_FAILURE") return "The persona policy led to choices that did not satisfy the oracle.";
   if (category === "AGENT_FAILURE") return "The browser agent failed to complete the task despite an executable persona policy.";
   if (category === "UI_AMBIGUITY") return "The UI made the next correct action ambiguous for this persona.";
@@ -924,6 +927,59 @@ function summarizeFailureCategory(category: FailureCategory | null) {
   if (category === "INFRA_FAILURE") return "Browserbase, network, or runtime infrastructure prevented a fair persona result.";
   if (category === "ORACLE_FAILURE") return "The success oracle could not make a valid determination.";
   return "The run failed for an unknown reason.";
+}
+
+function summarizePersonaFailureCategory(category: FailureCategory | null, personaKey?: string, mode?: RunMode) {
+  if (mode !== "DEMO_SAFE" || (category !== "PERSONA_FAILURE" && category !== "UI_AMBIGUITY")) return null;
+
+  const persona = normalizePersonaKey(personaKey);
+  if (!persona) return null;
+
+  if (persona === "mobile-first") {
+    return "On a 390x844 viewport, the persona found the visible field but the save/update action was not an obvious touch target, so the account email change never reached confirmation.";
+  }
+
+  if (persona === "impatient") {
+    return "The persona clicked the first plausible email field and save control, then stopped without inspecting alternatives or retrying after the vague result.";
+  }
+
+  if (persona === "esl") {
+    return "The Account email and Billing email labels were similar enough that this persona chose the wrong email field and never saw the required account-update confirmation.";
+  }
+
+  if (persona === "adversarial") {
+    return "After invalid input and back-navigation probing, the flow did not provide a clear recovery path back to a successful account email update.";
+  }
+
+  if (persona === "privacy-sensitive") {
+    return "Privacy, newsletter, or optional-data choices added friction around the core update, so this persona stayed cautious instead of moving cleanly to confirmation.";
+  }
+
+  if (persona === "power-user") {
+    return "The shortest direct path did not expose the exact account-email update and confirmation clearly enough for this persona's fast search-and-shortcut workflow.";
+  }
+
+  if (category === "UI_AMBIGUITY") {
+    return "The next correct action was not obvious enough for this persona's interaction style.";
+  }
+
+  if (category === "PERSONA_FAILURE") {
+    return "This persona's hardcoded behavior policy led to a plausible user choice that missed the configured success criteria.";
+  }
+
+  return null;
+}
+
+function normalizePersonaKey(personaKey?: string) {
+  const key = personaKey?.toLowerCase() || "";
+  if (!key) return "";
+  if (key.includes("mobile-first")) return "mobile-first";
+  if (key.includes("impatient") || key.includes("rushed-low-patience")) return "impatient";
+  if (key.includes("esl") || key.includes("plain-language")) return "esl";
+  if (key.includes("adversarial")) return "adversarial";
+  if (key.includes("privacy-sensitive")) return "privacy-sensitive";
+  if (key.includes("power-user")) return "power-user";
+  return key;
 }
 
 async function dismissLocalTunnelInterstitial(page: StagehandPage, targetUrl: string, logs: unknown[]) {

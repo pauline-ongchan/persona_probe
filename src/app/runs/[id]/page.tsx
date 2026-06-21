@@ -41,7 +41,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
     .filter((testCase) => isFailedStatus(testCase.status))
     .map((testCase) => ({
       testCase,
-      diagnosis: getFailureDiagnosis(testCase, run.oracleValue)
+      diagnosis: getFailureDiagnosis(testCase, run.oracleValue, run.mode)
     }));
   const fixAttempts = run.testCases.flatMap((testCase) =>
     testCase.fixAttempts.map((attempt) => ({
@@ -97,7 +97,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
             {run.testCases.map((testCase) => {
               const latestFixAttempt = testCase.fixAttempts[0] || null;
               const canCreateFix = isFailedStatus(testCase.status) && Boolean(testCase.failureReason);
-              const diagnosis = getFailureDiagnosis(testCase, run.oracleValue);
+              const diagnosis = getFailureDiagnosis(testCase, run.oracleValue, run.mode);
 
               return (
                 <article key={testCase.id} className="px-4 py-4">
@@ -405,19 +405,24 @@ function getNonFailureSummary(status: string) {
   return "Waiting for execution to start.";
 }
 
-function getFailureDiagnosis(testCase: FailureDiagnosisInput, expected: string) {
+function getFailureDiagnosis(testCase: FailureDiagnosisInput, expected: string, runMode: string) {
   const trace = parseActionTrace(testCase.actionTrace);
   const failedStep = [...trace].reverse().find((step) => step.oracleResult === "FAIL") || trace.at(-1) || null;
   const reason = getSpecificFailureReason(testCase, failedStep);
 
   return {
-    where: describeFailureLocation(testCase, failedStep, reason),
-    why: explainFailure(testCase, failedStep, reason, expected),
+    where: describeFailureLocation(testCase, failedStep, reason, runMode),
+    why: explainFailure(testCase, failedStep, reason, expected, runMode),
     evidence: getFailureEvidence(testCase, failedStep, expected)
   };
 }
 
-function describeFailureLocation(testCase: FailureDiagnosisInput, failedStep: TraceStep | null, reason: string) {
+function describeFailureLocation(
+  testCase: FailureDiagnosisInput,
+  failedStep: TraceStep | null,
+  reason: string,
+  runMode: string
+) {
   const normalized = reason.toLowerCase();
   if (isMissingDemoModalControl(normalized)) {
     return "Sample flow target: the page did not expose the expected privacy modal control.";
@@ -438,6 +443,9 @@ function describeFailureLocation(testCase: FailureDiagnosisInput, failedStep: Tr
     return "Success state: the expected confirmation element was missing from the final page.";
   }
 
+  const personaLocation = getPersonaFailureLocation(testCase, failedStep, reason, runMode);
+  if (personaLocation && (isGenericFailureReason(reason) || !failedStep?.chosenAction)) return personaLocation;
+
   const location = getUrlLabel(failedStep?.urlAfterAction || testCase.finalUrl);
   if (failedStep?.chosenAction) {
     return `${formatAction(failedStep.chosenAction)}${location ? ` on ${location}` : ""}`;
@@ -450,15 +458,20 @@ function explainFailure(
   testCase: FailureDiagnosisInput,
   failedStep: TraceStep | null,
   reason: string,
-  expected: string
+  expected: string,
+  runMode: string
 ) {
   if (isMissingDemoModalControl(reason.toLowerCase())) {
     return "FlowProof expected the built-in sample page with a privacy modal, but this run was created against a page that does not contain that modal. Create a new sample run after the latest deployment.";
   }
-  if (reason && !isGenericOracleFailure(reason, expected)) return reason;
+  const isGenericReason = isGenericFailureReason(reason, expected);
+  if (reason && !isGenericReason) return reason;
+
   if (testCase.failureCategory === "INFRA_FAILURE") {
     return "The browser run failed before FlowProof could judge the user flow.";
   }
+  const personaExplanation = getPersonaFailureExplanation(testCase, failedStep, expected, runMode);
+  if (personaExplanation) return personaExplanation;
   if (reason.toLowerCase().includes("selector")) {
     return `The run ended without finding the required selector "${expected}".`;
   }
@@ -484,7 +497,104 @@ function getSpecificFailureReason(testCase: FailureDiagnosisInput, failedStep: T
   const candidates = [failedStep?.failureReason, testCase.failureReason, testCase.agentSummary].filter(
     (value): value is string => Boolean(value && value.trim())
   );
-  return candidates.find((value) => !isGenericOracleFailure(value)) || candidates[0] || "No failure reason captured.";
+  return candidates.find((value) => !isGenericFailureReason(value)) || candidates[0] || "No failure reason captured.";
+}
+
+function getPersonaFailureLocation(
+  testCase: FailureDiagnosisInput,
+  failedStep: TraceStep | null,
+  reason: string,
+  runMode: string
+) {
+  if (!shouldUseSamplePersonaCopy(testCase, runMode)) return null;
+
+  const persona = normalizePersonaKey(testCase.persona.key);
+  const location = getUrlLabel(failedStep?.urlAfterAction || testCase.finalUrl);
+  const suffix = location ? ` on ${location}` : "";
+
+  if (persona === "mobile-first") {
+    return `Mobile viewport${suffix}: the visible field was reachable, but the save/update action was not an obvious touch target.`;
+  }
+  if (persona === "impatient") {
+    return `First-plausible path${suffix}: the persona saved after choosing the first reasonable-looking email field.`;
+  }
+  if (persona === "esl") {
+    return `Email fields${suffix}: Account email and Billing email were easy to confuse.`;
+  }
+  if (persona === "adversarial") {
+    return `Validation recovery${suffix}: invalid input and back navigation left the flow off the success path.`;
+  }
+  if (persona === "privacy-sensitive") {
+    return `Privacy-sensitive path${suffix}: optional consent or personal-data choices interrupted the account update.`;
+  }
+  if (persona === "power-user") {
+    return `Direct-navigation path${suffix}: the fastest route did not make the required confirmation clear.`;
+  }
+
+  if (testCase.failureCategory === "UI_AMBIGUITY" && reason) {
+    return `Ambiguous next action${suffix || "."}`;
+  }
+
+  return null;
+}
+
+function getPersonaFailureExplanation(
+  testCase: FailureDiagnosisInput,
+  failedStep: TraceStep | null,
+  expected: string,
+  runMode: string
+) {
+  if (!shouldUseSamplePersonaCopy(testCase, runMode)) return null;
+
+  const persona = normalizePersonaKey(testCase.persona.key);
+  const failedAction = failedStep?.chosenAction ? ` Last recorded action: ${formatAction(failedStep.chosenAction)}.` : "";
+
+  if (persona === "mobile-first") {
+    return `On the 390x844 mobile viewport, this persona uses only obvious visible touch targets. The account email field was reachable, but the save/update action was not visible enough to complete the confirmation "${expected}".${failedAction}`;
+  }
+  if (persona === "impatient") {
+    return `This persona clicks the first plausible control and does not retry. Billing email and the vague save action looked good enough, so they stopped before finding the exact path to "${expected}".${failedAction}`;
+  }
+  if (persona === "esl") {
+    return `This persona needs literal labels. The Account email versus Billing email distinction was too subtle, so they chose the wrong email field and never reached "${expected}".${failedAction}`;
+  }
+  if (persona === "adversarial") {
+    return `This persona intentionally tries invalid input, changes direction, and uses back navigation. The flow did not recover clearly from that edge-case path, so it never reached "${expected}".${failedAction}`;
+  }
+  if (persona === "privacy-sensitive") {
+    return `This persona refuses optional tracking, newsletters, permissions, and unnecessary data. Those choices added friction around the account update before the page reached "${expected}".${failedAction}`;
+  }
+  if (persona === "power-user") {
+    return `This persona uses shortcuts and direct targeting. The flow did not expose a clean enough fast path to the exact account-email update and "${expected}" confirmation.${failedAction}`;
+  }
+
+  if (testCase.failureCategory === "UI_AMBIGUITY") {
+    return `The next correct action was not obvious enough for ${testCase.persona.name}.`;
+  }
+  if (testCase.failureCategory === "PERSONA_FAILURE") {
+    return `${testCase.persona.name}'s behavior policy led to a plausible user choice that missed "${expected}".`;
+  }
+
+  return null;
+}
+
+function shouldUseSamplePersonaCopy(testCase: FailureDiagnosisInput, runMode: string) {
+  return runMode === "DEMO_SAFE" && ["PERSONA_FAILURE", "UI_AMBIGUITY"].includes(testCase.failureCategory || "");
+}
+
+function normalizePersonaKey(personaKey: string) {
+  const key = personaKey.toLowerCase();
+  if (key.includes("mobile-first")) return "mobile-first";
+  if (key.includes("impatient") || key.includes("rushed-low-patience")) return "impatient";
+  if (key.includes("esl") || key.includes("plain-language")) return "esl";
+  if (key.includes("adversarial")) return "adversarial";
+  if (key.includes("privacy-sensitive")) return "privacy-sensitive";
+  if (key.includes("power-user")) return "power-user";
+  return key;
+}
+
+function isGenericFailureReason(value: string, expected?: string) {
+  return isGenericOracleFailure(value, expected) || isGenericCategorySummary(value);
 }
 
 function isGenericOracleFailure(value: string, expected?: string) {
@@ -493,6 +603,16 @@ function isGenericOracleFailure(value: string, expected?: string) {
     normalized.includes("page text did not contain") ||
     normalized.includes("final url did not contain") ||
     normalized === `the flow ended without showing the required success confirmation "${expected || ""}".`.toLowerCase()
+  );
+}
+
+function isGenericCategorySummary(value: string) {
+  const normalized = value.toLowerCase();
+  return (
+    normalized === "the persona policy led to choices that did not satisfy the oracle." ||
+    normalized === "the browser agent failed to complete the task despite an executable persona policy." ||
+    normalized === "the ui made the next correct action ambiguous for this persona." ||
+    normalized === "the run failed for an unknown reason."
   );
 }
 
