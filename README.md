@@ -45,7 +45,7 @@ FIX_CONTEXT_SECRET=
 
 `GITHUB_TOKEN` should be server-only and scoped to the target website repo with permission to trigger Actions workflows.
 
-`PERSONAPROBE_APP_URL` must be publicly reachable by GitHub Actions. `localhost` will not work for the full workflow unless you use a public tunnel.
+`PERSONAPROBE_APP_URL` must be a plain public URL that GitHub Actions can reach, for example `https://persona-probe.example.com`. Do not paste a Markdown link like `[persona-probe.example.com](https://persona-probe.example.com)`. `localhost` will not work for the full workflow unless you use a public tunnel.
 
 `FIX_CONTEXT_SECRET` signs fix-context URLs. Generate one with:
 

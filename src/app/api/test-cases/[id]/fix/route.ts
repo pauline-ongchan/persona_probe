@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { collectFixContext } from "@/lib/fix/collectFixContext";
 import { createFixContextToken } from "@/lib/fix/fixContextToken";
+import { normalizePublicAppUrl } from "@/lib/fix/publicAppUrl";
 import { redactFixContext } from "@/lib/fix/redactFixContext";
 import { triggerAutofixWorkflow } from "@/lib/fix/triggerAutofixWorkflow";
 import { setSafeTags, withSentrySpan } from "@/lib/sentry/withSentrySpan";
@@ -58,9 +59,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       github_repo: project.githubRepo
     });
 
-    const appUrl = process.env.PERSONAPROBE_APP_URL?.replace(/\/$/, "");
+    const appUrl = normalizePublicAppUrl(process.env.PERSONAPROBE_APP_URL);
     if (!appUrl) {
-      return NextResponse.json({ error: "PERSONAPROBE_APP_URL is required to create signed fix-context URLs." }, { status: 500 });
+      return NextResponse.json(
+        {
+          error:
+            "PERSONAPROBE_APP_URL must be a plain http(s) URL like https://persona-probe.example.com."
+        },
+        { status: 500 }
+      );
     }
 
     const cleanContext = redactFixContext(await collectFixContext({ testCaseId: id, projectId: project.id }));

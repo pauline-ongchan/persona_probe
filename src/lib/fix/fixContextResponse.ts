@@ -1,4 +1,5 @@
 import { FIX_ATTEMPT_CALLBACK_STATUSES, type FixContext, type FixContextResponse } from "./types";
+import { normalizePublicAppUrl } from "./publicAppUrl";
 
 export function buildFixContextResponse({
   appUrl,
@@ -13,7 +14,7 @@ export function buildFixContextResponse({
   requestUrl: string;
   token: string;
 }): FixContextResponse {
-  const publicAppUrl = appUrl?.replace(/\/$/, "") || new URL(requestUrl).origin;
+  const publicAppUrl = normalizePublicAppUrl(appUrl) || new URL(requestUrl).origin;
 
   return {
     ...fixContext,
