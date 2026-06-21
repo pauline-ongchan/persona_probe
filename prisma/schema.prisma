@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum RunStatus {
@@ -64,19 +65,19 @@ model Run {
 }
 
 model Project {
-  id               String       @id @default(cuid())
-  name             String
-  targetUrl        String
-  githubOwner      String
-  githubRepo       String
-  baseBranch       String       @default("main")
-  autofixWorkflow  String       @default("personaprobe-autofix.yml")
-  sentryOrg        String?
-  sentryProject    String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  runs             Run[]
-  fixAttempts      FixAttempt[]
+  id              String       @id @default(cuid())
+  name            String
+  targetUrl       String
+  githubOwner     String
+  githubRepo      String
+  baseBranch      String       @default("main")
+  autofixWorkflow String       @default("personaprobe-autofix.yml")
+  sentryOrg       String?
+  sentryProject   String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  runs            Run[]
+  fixAttempts     FixAttempt[]
 }
 
 model Persona {
@@ -90,11 +91,11 @@ model Persona {
 }
 
 model TestCase {
-  id                    String         @id @default(cuid())
+  id                    String           @id @default(cuid())
   runId                 String
   personaId             String
-  status                TestCaseStatus @default(PENDING)
-  priorityScore         Float          @default(0)
+  status                TestCaseStatus   @default(PENDING)
+  priorityScore         Float            @default(0)
   browserbaseSessionId  String?
   browserbaseSessionUrl String?
   sentryTraceId         String?
@@ -107,12 +108,12 @@ model TestCase {
   finalUrl              String?
   finalTextSample       String?
   screenshotUrl         String?
-  actionTrace           String         @default("[]")
-  rawLogs               String         @default("[]")
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
-  run                   Run            @relation(fields: [runId], references: [id], onDelete: Cascade)
-  persona               Persona        @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  actionTrace           String           @default("[]")
+  rawLogs               String           @default("[]")
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  run                   Run              @relation(fields: [runId], references: [id], onDelete: Cascade)
+  persona               Persona          @relation(fields: [personaId], references: [id], onDelete: Cascade)
   fixAttempts           FixAttempt[]
 
   @@index([runId])

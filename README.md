@@ -17,9 +17,10 @@ PersonaProbe uses Prisma with Postgres. For local development, use any local or 
 
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
+DIRECT_URL="postgresql://USER:PASSWORD@DIRECT_HOST:5432/DATABASE?sslmode=require"
 ```
 
-For a fast hosted option, create a Neon or Supabase Postgres database and paste its connection string into `.env`.
+For a fast hosted option, create a Neon or Supabase Postgres database and paste its connection strings into `.env`. With Supabase, use the pooled connection string for `DATABASE_URL` and the direct connection string for `DIRECT_URL`.
 
 ## Autofix PR flow
 
@@ -34,6 +35,7 @@ Required env vars:
 
 ```bash
 DATABASE_URL=
+DIRECT_URL=
 GITHUB_TOKEN=
 PERSONAPROBE_APP_URL=
 FIX_CONTEXT_SECRET=
@@ -67,4 +69,4 @@ Then configure a Project in PersonaProbe with:
 
 ## Deployment note
 
-Vercel can host the Next.js app. Add `DATABASE_URL` in Vercel before deploying for a working app. During `npm run build`, PersonaProbe runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured.
+Vercel can host the Next.js app. Add `DATABASE_URL` and `DIRECT_URL` in Vercel before deploying for a working app. During `npm run build`, PersonaProbe runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured.
