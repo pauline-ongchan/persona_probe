@@ -7,6 +7,7 @@ import { SelfHealRunButton } from "@/components/SelfHealRunButton";
 import { StartRunButton } from "@/components/StartRunButton";
 import { prisma } from "@/lib/prisma/client";
 import { formatDuration, formatPercent, getRunAggregates } from "@/lib/runs/aggregates";
+import { getSentryTraceUrl } from "@/lib/sentry/traceUrl";
 
 export default async function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -137,7 +138,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
                         {testCase.sentryTraceId ? (
                           <a
                             className="inline-flex items-center gap-1 font-medium text-ink"
-                            href={getSentryTraceUrl(testCase.sentryTraceId)}
+                            href={getSentryTraceUrl(testCase.sentryTraceId, run.project?.sentryOrg)}
                             rel="noreferrer"
                             target="_blank"
                           >
@@ -414,10 +415,6 @@ function parseActionTrace(actionTrace: string): TraceStep[] {
   } catch {
     return [];
   }
-}
-
-function getSentryTraceUrl(traceId: string) {
-  return `https://sentry.io/performance/trace/${traceId}`;
 }
 
 function formatRawLogs(rawLogs: string) {

@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { getSentryTracesSampleRate } from "@/lib/sentry/config";
 
 type Primitive = string | number | boolean | null | undefined;
 
@@ -11,7 +12,7 @@ export function ensureSentryServer() {
 
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
-    tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
+    tracesSampleRate: getSentryTracesSampleRate(),
     enableLogs: true,
     sendDefaultPii: false
   });

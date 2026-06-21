@@ -96,7 +96,6 @@ export type TestCaseResult = {
 
 export async function runStagehandTest(input: StagehandTestInput): Promise<TestCaseResult> {
   const startedAt = Date.now();
-  const traceId = Sentry.getActiveSpan()?.spanContext().traceId ?? null;
   const model = process.env.DEFAULT_STAGEHAND_MODEL || "google/gemini-3.5-flash";
   const logs: unknown[] = [];
   let stagehand: StagehandInstance | null = null;
@@ -117,6 +116,8 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
       "oracle.type": input.oracle.type
     },
     async () => {
+      const traceId = Sentry.getActiveSpan()?.spanContext().traceId ?? null;
+
       Sentry.setTags({
         run_id: input.runId,
         persona: input.persona.key,
