@@ -13,7 +13,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -23,14 +23,138 @@ jobs:
       - name: Checkout target repo
         uses: actions/checkout@v4
 
-      - name: Fetch PersonaProbe fix context
+      - name: Create draft fix PR
         env:
           FIX_CONTEXT_URL: ${{ inputs.fix_context_url }}
+          FIX_ATTEMPT_ID: ${{ inputs.fix_attempt_id }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
+          set -euo pipefail
+
+          callback_url=""
+          callback_token=""
+
+          callback() {
+            local status="$1"
+            local pr_url="${2:-}"
+            local error_message="${3:-}"
+            local body
+
+            if [ -z "$callback_url" ] || [ -z "$callback_token" ]; then
+              return 0
+            fi
+
+            body=$(jq -n \
+              --arg status "$status" \
+              --arg prUrl "$pr_url" \
+              --arg errorMessage "$error_message" \
+              --arg runId "$GITHUB_RUN_ID" \
+              --arg runUrl "$GITHUB_SERVER_URL/$REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              --arg branch "${branch_name:-}" \
+              --arg commitSha "${commit_sha:-}" \
+              --arg attemptId "$FIX_ATTEMPT_ID" \
+              '{
+                status: $status,
+                githubWorkflowRunId: $runId,
+                evidence: {
+                  workflowRunUrl: $runUrl,
+                  branch: $branch,
+                  commitSha: $commitSha,
+                  patchPath: "personaprobe-fix-evidence/\($attemptId).md",
+                  patchSummary: "Placeholder PersonaProbe evidence patch"
+                }
+              }
+              + (if $prUrl != "" then {prUrl: $prUrl} else {} end)
+              + (if $errorMessage != "" then {errorMessage: $errorMessage} else {} end)')
+
+            curl --fail --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer $callback_token" \
+              --header "Content-Type: application/json" \
+              --data "$body" \
+              "$callback_url" || true
+          }
+
+          on_error() {
+            local exit_code=$?
+            callback "FAILED" "" "PersonaProbe autofix workflow failed at line $1 with exit code $exit_code."
+            exit "$exit_code"
+          }
+
+          trap 'on_error $LINENO' ERR
+
           curl --fail --silent --show-error "$FIX_CONTEXT_URL" > fix-context.json
+          callback_url=$(jq -r '.callback.url // ""' fix-context.json)
+          callback_token=$(jq -r '.callback.bearerToken // ""' fix-context.json)
+          callback "CONTEXT_FETCHED"
+
           jq '{version, testCase: .testCase, target: .target, browserbase: .browserbase, sentry: .sentry, actionTraceSteps: (.actionTrace | length)}' fix-context.json
 
-      - name: Coding agent stub
-        run: |
-          echo "TODO: run coding agent for PersonaProbe FixAttempt ${{ inputs.fix_attempt_id }}"
-          echo "The agent should read fix-context.json, make the smallest safe change, add tests when practical, and open a draft PR."
+          base_branch=$(jq -r '.target.baseBranch // "main"' fix-context.json)
+          branch_name="personaprobe/autofix-${FIX_ATTEMPT_ID}"
+          evidence_file="personaprobe-fix-evidence/${FIX_ATTEMPT_ID}.md"
+
+          git config user.name "personaprobe-autofix[bot]"
+          git config user.email "personaprobe-autofix[bot]@users.noreply.github.com"
+          git checkout -B "$branch_name"
+
+          mkdir -p personaprobe-fix-evidence
+
+          node <<'NODE'
+          const fs = require("fs");
+          const context = JSON.parse(fs.readFileSync("fix-context.json", "utf8"));
+          const attemptId = process.env.FIX_ATTEMPT_ID;
+          const trace = Array.isArray(context.actionTrace) ? context.actionTrace : [];
+          const lines = [
+            `# PersonaProbe Fix Evidence`,
+            ``,
+            `FixAttempt: ${attemptId}`,
+            `TestCase: ${context.testCase?.id ?? "unknown"}`,
+            `Run: ${context.testCase?.runId ?? "unknown"}`,
+            `Persona: ${context.testCase?.persona ?? "unknown"}`,
+            `Failure: ${context.testCase?.failureReason ?? "unknown"}`,
+            `Final URL: ${context.testCase?.finalUrl ?? context.browserbase?.finalUrl ?? "unknown"}`,
+            ``,
+            `## Target`,
+            ``,
+            `- URL: ${context.target?.url ?? "unknown"}`,
+            `- Route hint: ${context.target?.routeHint ?? "unknown"}`,
+            `- Base branch: ${context.target?.baseBranch ?? "unknown"}`,
+            ``,
+            `## Action Trace`,
+            ``,
+            trace.length
+              ? trace.map((step) => `- Step ${step.step}: ${step.action}${step.observation ? ` (${step.observation})` : ""}`).join("\n")
+              : "- No action trace captured.",
+            ``,
+            `## Next Step`,
+            ``,
+            `This placeholder patch proves the PersonaProbe autofix handoff loop. Replace it with the smallest safe product fix and a regression test before marking the draft PR ready.`
+          ];
+
+          fs.writeFileSync(`personaprobe-fix-evidence/${attemptId}.md`, `${lines.join("\n")}\n`);
+          NODE
+
+          git add "$evidence_file"
+          git commit -m "chore: add PersonaProbe fix evidence"
+          commit_sha=$(git rev-parse HEAD)
+          git push --force-with-lease --set-upstream origin "$branch_name"
+
+          pr_body_file="personaprobe-fix-evidence/${FIX_ATTEMPT_ID}-pr-body.md"
+          {
+            echo "PersonaProbe generated this draft PR from FixAttempt ${FIX_ATTEMPT_ID}."
+            echo
+            echo "This demo workflow commits a placeholder evidence file so the end-to-end handoff can be verified. Replace the placeholder with the smallest safe UI fix and a regression test before requesting review."
+            echo
+            echo "Fix context was fetched from PersonaProbe and redacted before use."
+          } > "$pr_body_file"
+
+          pr_url=$(gh pr create \
+            --draft \
+            --base "$base_branch" \
+            --head "$branch_name" \
+            --title "PersonaProbe autofix evidence for ${FIX_ATTEMPT_ID}" \
+            --body-file "$pr_body_file")
+
+          callback "PR_OPENED" "$pr_url"

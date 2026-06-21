@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
+import { buildFixContextResponse } from "@/lib/fix/fixContextResponse";
+import { getStatusAfterContextFetch } from "@/lib/fix/fixAttemptStatus";
 import { verifyFixContextToken } from "@/lib/fix/fixContextToken";
+import type { FixContext } from "@/lib/fix/types";
 import { setSafeTags, withSentrySpan } from "@/lib/sentry/withSentrySpan";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -19,6 +22,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       select: {
         id: true,
         testCaseId: true,
+        status: true,
         fixContextJson: true,
         fixContextToken: true,
         project: {
@@ -41,7 +45,23 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       github_repo: fixAttempt.project.githubRepo
     });
 
-    return NextResponse.json(fixAttempt.fixContextJson, { headers: noStoreHeaders() });
+    const nextStatus = getStatusAfterContextFetch(fixAttempt.status);
+    if (nextStatus !== fixAttempt.status) {
+      await prisma.fixAttempt.update({
+        where: { id },
+        data: { status: nextStatus }
+      });
+    }
+
+    const responseBody = buildFixContextResponse({
+      appUrl: process.env.PERSONAPROBE_APP_URL,
+      fixAttemptId: fixAttempt.id,
+      fixContext: fixAttempt.fixContextJson as unknown as FixContext,
+      requestUrl: request.url,
+      token
+    });
+
+    return NextResponse.json(responseBody, { headers: noStoreHeaders() });
   });
 }
 
