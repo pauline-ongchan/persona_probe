@@ -25,7 +25,7 @@ export default async function RunsPage() {
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">Recent</p>
-          <h1 className="mt-2 text-3xl font-semibold">Runs</h1>
+          <h1 className="mt-2 text-3xl font-semibold">FlowProof runs</h1>
         </div>
         <Link className="rounded bg-ink px-4 py-2 text-sm font-medium text-white" href="/">
           New run
@@ -40,7 +40,7 @@ export default async function RunsPage() {
               <th className="px-4 py-3">Mode</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Target</th>
-              <th className="px-4 py-3">Persona fail rate</th>
+              <th className="px-4 py-3">Issue rate</th>
               <th className="px-4 py-3">Failures</th>
               <th className="px-4 py-3" />
             </tr>
@@ -60,7 +60,7 @@ export default async function RunsPage() {
                         run.mode === "DEMO_SAFE" ? "bg-moss/15 text-moss" : "bg-ink text-white"
                       }`}
                     >
-                      {run.mode === "DEMO_SAFE" ? "Demo-Safe" : "Real Website"}
+                      {run.mode === "DEMO_SAFE" ? "Sample flow" : "Target website"}
                     </span>
                   </td>
                   <td className="px-4 py-3">{run.status}</td>

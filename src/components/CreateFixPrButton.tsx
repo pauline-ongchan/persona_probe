@@ -48,28 +48,32 @@ export function CreateFixPrButton({
     setIsLoading(true);
     setError(null);
 
-    const response = await fetch(`/api/test-cases/${testCaseId}/fix`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(projectId ? { projectId } : {})
-    });
+    try {
+      const response = await fetch(`/api/test-cases/${testCaseId}/fix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(projectId ? { projectId } : {})
+      });
 
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error || "Could not trigger the autofix workflow.");
-      if (payload.fixAttempt) setFixAttempt(payload.fixAttempt);
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error || "Could not trigger the autofix workflow.");
+        if (payload.fixAttempt) setFixAttempt(payload.fixAttempt);
+        return;
+      }
+
+      setFixAttempt(payload.fixAttempt);
+      router.refresh();
+    } catch {
+      setError("Could not trigger the autofix workflow.");
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    setFixAttempt(payload.fixAttempt);
-    setIsLoading(false);
-    router.refresh();
   }
 
   const hasTriggered = Boolean(fixAttempt && fixAttempt.status !== "FAILED");
   const buttonLabel = isLoading
-    ? "Creating..."
+    ? "Triggering workflow..."
     : hasTriggered
       ? "Autofix workflow triggered"
       : "Create Fix PR";
@@ -91,9 +95,13 @@ export function CreateFixPrButton({
         )}
         {buttonLabel}
       </button>
+      {isLoading ? <p className="text-xs leading-5 text-slate-500">Dispatching the fix workflow...</p> : null}
       {fixAttempt ? (
         <div className="text-xs text-slate-500">
           <span className="font-medium text-slate-700">{fixAttempt.status.replaceAll("_", " ")}</span>
+          {!fixAttempt.prUrl && hasTriggered ? (
+            <span className="mt-1 block leading-5">Workflow queued. PR link will appear after GitHub creates it.</span>
+          ) : null}
           {fixAttempt.prUrl ? (
             <a
               className="mt-1 inline-flex items-center gap-1 font-medium text-ink"

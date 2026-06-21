@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { Activity, ArrowUpRight, Clock, ListChecks, MousePointer2, TriangleAlert } from "lucide-react";
+import { Activity, ArrowUpRight, CheckCircle2, Clock, ListChecks, MousePointer2, SearchCheck, TriangleAlert } from "lucide-react";
 import { CreateFixPrButton } from "@/components/CreateFixPrButton";
 import { SelfHealRunButton } from "@/components/SelfHealRunButton";
 import { StartRunButton } from "@/components/StartRunButton";
@@ -38,6 +38,18 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
       (testCase) =>
         (testCase.status === "FAIL" || testCase.status === "ERROR") && testCase.failureCategory !== "INFRA_FAILURE"
     );
+  const failureDiagnoses = run.testCases
+    .filter((testCase) => isFailedStatus(testCase.status))
+    .map((testCase) => ({
+      testCase,
+      diagnosis: getFailureDiagnosis(testCase, run.oracleValue)
+    }));
+  const fixAttempts = run.testCases.flatMap((testCase) =>
+    testCase.fixAttempts.map((attempt) => ({
+      testCase,
+      attempt
+    }))
+  );
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8">
@@ -50,7 +62,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
           <p className="mt-2 max-w-3xl text-slate-600">{run.taskGoal}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <ModePill mode={run.mode} />
-            <p className="max-w-3xl truncate text-sm text-slate-500">{run.targetUrl}</p>
+            <p className="min-w-0 max-w-full truncate text-sm text-slate-500">{run.targetUrl}</p>
           </div>
         </div>
         <div className="flex flex-col gap-2">
@@ -76,141 +88,111 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
         </p>
       ) : null}
 
-      <section className="mt-6 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
-        <div className="rounded border border-slate-200 bg-white">
+      <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 rounded border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="font-semibold">Persona matrix</h2>
+            <h2 className="font-semibold">Persona results</h2>
+            <p className="mt-1 text-sm text-slate-500">Each result shows where the flow stopped and why that persona struggled.</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1060px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Persona</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Priority</th>
-                  <th className="px-4 py-3">Duration</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Failure reason</th>
-                  <th className="px-4 py-3">Browserbase</th>
-                  <th className="px-4 py-3">Sentry</th>
-                  <th className="px-4 py-3">Autofix</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {run.testCases.map((testCase) => {
-                  const latestFixAttempt = testCase.fixAttempts[0] || null;
-                  const canCreateFix =
-                    (testCase.status === "FAIL" || testCase.status === "ERROR") && Boolean(testCase.failureReason);
+          <div className="divide-y divide-slate-100">
+            {run.testCases.map((testCase) => {
+              const latestFixAttempt = testCase.fixAttempts[0] || null;
+              const canCreateFix = isFailedStatus(testCase.status) && Boolean(testCase.failureReason);
+              const diagnosis = getFailureDiagnosis(testCase, run.oracleValue);
 
-                  return (
-                    <tr key={testCase.id}>
-                      <td className="px-4 py-3">
-                        <span className="block font-medium">{testCase.persona.name}</span>
-                        <span className="block text-xs text-slate-500">{testCase.persona.description}</span>
-                      </td>
-                      <td className="px-4 py-3">
+              return (
+                <article key={testCase.id} className="px-4 py-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{testCase.persona.name}</h3>
                         <StatusPill status={testCase.status} />
-                      </td>
-                      <td className="px-4 py-3">{testCase.priorityScore.toFixed(3)}</td>
-                      <td className="px-4 py-3">{formatDuration(testCase.durationMs)}</td>
-                      <td className="px-4 py-3">
                         <CategoryPill category={testCase.failureCategory} />
-                      </td>
-                      <td className="max-w-xs px-4 py-3 text-slate-600">
-                        {testCase.failureReason || testCase.agentSummary || "Waiting to run"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {testCase.browserbaseSessionUrl ? (
-                          <a
-                            className="inline-flex items-center gap-1 font-medium text-ink"
-                            href={testCase.browserbaseSessionUrl}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            Open
-                            <ArrowUpRight className="h-4 w-4" />
-                          </a>
-                        ) : (
-                          <span className="text-slate-400">n/a</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {testCase.sentryTraceId ? (
-                          <a
-                            className="inline-flex items-center gap-1 font-medium text-ink"
-                            href={getSentryTraceUrl(testCase.sentryTraceId, run.project?.sentryOrg)}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            Trace
-                            <ArrowUpRight className="h-4 w-4" />
-                          </a>
-                        ) : (
-                          <span className="text-slate-400">n/a</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <CreateFixPrButton
-                          disabled={!canCreateFix}
-                          initialFixAttempt={
-                            latestFixAttempt
-                              ? {
-                                  id: latestFixAttempt.id,
-                                  status: latestFixAttempt.status,
-                                  prUrl: latestFixAttempt.prUrl,
-                                  errorMessage: latestFixAttempt.errorMessage
-                                }
-                              : null
-                          }
-                          projectId={run.projectId}
-                          testCaseId={testCase.id}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">{testCase.persona.description}</p>
+                    </div>
+                    <span className="shrink-0 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                      {formatDuration(testCase.durationMs)}
+                    </span>
+                  </div>
+
+                  {isFailedStatus(testCase.status) ? (
+                    <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                      <InsightBlock label="Where" value={diagnosis.where} />
+                      <InsightBlock label="Why" value={diagnosis.why} />
+                      <InsightBlock label="Evidence" value={diagnosis.evidence} />
+                    </div>
+                  ) : (
+                    <div
+                      className={`mt-4 flex items-start gap-2 rounded border p-3 text-sm ${
+                        testCase.status === "PASS"
+                          ? "border-moss/20 bg-moss/10 text-moss"
+                          : "border-slate-200 bg-slate-50 text-slate-600"
+                      }`}
+                    >
+                      {testCase.status === "PASS" ? (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                      ) : (
+                        <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                      )}
+                      <p>{getNonFailureSummary(testCase.status)}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <ResultLink href={testCase.browserbaseSessionUrl} label="Browserbase" />
+                    <ResultLink
+                      href={testCase.sentryTraceId ? getSentryTraceUrl(testCase.sentryTraceId, run.project?.sentryOrg) : null}
+                      label="Sentry trace"
+                    />
+                    <CreateFixPrButton
+                      disabled={!canCreateFix}
+                      initialFixAttempt={
+                        latestFixAttempt
+                          ? {
+                              id: latestFixAttempt.id,
+                              status: latestFixAttempt.status,
+                              prUrl: latestFixAttempt.prUrl,
+                              errorMessage: latestFixAttempt.errorMessage
+                            }
+                          : null
+                      }
+                      projectId={run.projectId}
+                      testCaseId={testCase.id}
+                    />
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
 
-        <aside className="space-y-6">
-          <section className="rounded border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <h2 className="font-semibold">Ranked risk</h2>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {aggregates.personaRisks.map((risk) => (
-                <div key={risk.key} className="px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{risk.name}</span>
-                    <span className="text-sm text-coral">{formatPercent(risk.failureRate)}</span>
-                  </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded bg-slate-100">
-                    <div className="h-full bg-coral" style={{ width: `${Math.min(risk.riskScore * 100, 100)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <h2 className="font-semibold">Top failures</h2>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {aggregates.topFailures.map((testCase) => (
-                <div key={testCase.persona.key + testCase.finalUrl} className="px-4 py-3 text-sm">
+        <aside className="min-w-0 self-start rounded border border-slate-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
+            <SearchCheck className="h-5 w-5 text-slate-500" />
+            <h2 className="font-semibold">Failure diagnosis</h2>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {failureDiagnoses.map(({ testCase, diagnosis }) => (
+              <article key={testCase.id} className="px-4 py-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{testCase.persona.name}</p>
-                  <p className="mt-1 text-slate-600">{testCase.failureReason || "No failure reason captured."}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">{testCase.finalUrl || "No final URL"}</p>
+                  <StatusPill status={testCase.status} />
                 </div>
-              ))}
-              {!aggregates.topFailures.length ? (
-                <p className="px-4 py-5 text-sm text-slate-500">No failures yet.</p>
-              ) : null}
-            </div>
-          </section>
+                <p className="mt-3 leading-6 text-slate-600">
+                  <span className="font-medium text-slate-800">Where:</span> {diagnosis.where}
+                </p>
+                <p className="mt-2 leading-6 text-slate-600">
+                  <span className="font-medium text-slate-800">Why:</span> {diagnosis.why}
+                </p>
+              </article>
+            ))}
+            {!failureDiagnoses.length ? (
+              <p className="px-4 py-5 text-sm leading-6 text-slate-500">
+                No diagnosed failures yet. Start the run to generate persona evidence.
+              </p>
+            ) : null}
+          </div>
         </aside>
       </section>
 
@@ -218,55 +200,37 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
         <div className="border-b border-slate-200 px-4 py-3">
           <h2 className="font-semibold">Fix Attempts</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[840px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3">Persona</th>
-                <th className="px-4 py-3">Failure reason</th>
-                <th className="px-4 py-3">GitHub repo</th>
-                <th className="px-4 py-3">PR</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {run.testCases.flatMap((testCase) =>
-                testCase.fixAttempts.map((attempt) => (
-                  <tr key={attempt.id}>
-                    <td className="px-4 py-3">
-                      <StatusPill status={attempt.status} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{attempt.createdAt.toLocaleString()}</td>
-                    <td className="px-4 py-3 font-medium">{testCase.persona.name}</td>
-                    <td className="max-w-sm px-4 py-3 text-slate-600">
-                      {testCase.failureReason || attempt.errorMessage || "No failure reason captured."}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {attempt.project.githubOwner}/{attempt.project.githubRepo}
-                    </td>
-                    <td className="px-4 py-3">
-                      {attempt.prUrl ? (
-                        <a className="inline-flex items-center gap-1 font-medium text-ink" href={attempt.prUrl} target="_blank" rel="noreferrer">
-                          View PR
-                          <ArrowUpRight className="h-4 w-4" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-400">n/a</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+        <div className="divide-y divide-slate-100">
+          {fixAttempts.map(({ testCase, attempt }) => (
+            <article key={attempt.id} className="grid gap-3 px-4 py-4 text-sm lg:grid-cols-[0.7fr_1fr_0.9fr_auto] lg:items-start">
+              <div>
+                <StatusPill status={attempt.status} />
+                <p className="mt-2 text-xs text-slate-500">{attempt.createdAt.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="font-medium">{testCase.persona.name}</p>
+                <p className="mt-1 leading-6 text-slate-600">
+                  {testCase.failureReason || attempt.errorMessage || "No failure reason captured."}
+                </p>
+              </div>
+              <p className="break-words text-slate-600">
+                {attempt.project.githubOwner}/{attempt.project.githubRepo}
+              </p>
+              {attempt.prUrl ? (
+                <a className="inline-flex items-center gap-1 font-medium text-ink" href={attempt.prUrl} target="_blank" rel="noreferrer">
+                  View PR
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              ) : (
+                <span className="text-slate-400">n/a</span>
               )}
-              {!run.testCases.some((testCase) => testCase.fixAttempts.length) ? (
-                <tr>
-                  <td className="px-4 py-5 text-sm text-slate-500" colSpan={6}>
-                    No fix attempts yet.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+            </article>
+          ))}
+          {!fixAttempts.length ? (
+            <p className="px-4 py-5 text-sm text-slate-500">
+              No fix attempts yet.
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -362,6 +326,28 @@ function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: str
   );
 }
 
+function InsightBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 break-words text-sm leading-6 text-slate-700">{value}</p>
+    </div>
+  );
+}
+
+function ResultLink({ href, label }: { href: string | null; label: string }) {
+  if (!href) {
+    return <span className="text-sm text-slate-400">{label}: n/a</span>;
+  }
+
+  return (
+    <a className="inline-flex items-center gap-1 text-sm font-medium text-ink" href={href} rel="noreferrer" target="_blank">
+      {label}
+      <ArrowUpRight className="h-4 w-4" />
+    </a>
+  );
+}
+
 function StatusPill({ status }: { status: string }) {
   const classes =
     status === "PASS"
@@ -376,7 +362,7 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function ModePill({ mode }: { mode: string }) {
-  const label = mode === "DEMO_SAFE" ? "Demo-Safe Mode" : "Real Website Mode";
+  const label = mode === "DEMO_SAFE" ? "Sample flow" : "Target website";
   const classes = mode === "DEMO_SAFE" ? "bg-moss/15 text-moss" : "bg-ink text-white";
   return <span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${classes}`}>{label}</span>;
 }
@@ -396,6 +382,134 @@ function CategoryPill({ category }: { category: string | null }) {
           : "bg-ink/10 text-ink";
 
   return <span className={`inline-flex rounded px-2 py-1 text-xs font-medium ${classes}`}>{category.replaceAll("_", " ")}</span>;
+}
+
+type FailureDiagnosisInput = {
+  status: string;
+  failureReason: string | null;
+  failureCategory: string | null;
+  finalUrl: string | null;
+  finalTextSample: string | null;
+  actionTrace: string;
+  agentSummary: string | null;
+  persona: {
+    key: string;
+    name: string;
+    description: string;
+  };
+};
+
+function isFailedStatus(status: string) {
+  return status === "FAIL" || status === "ERROR";
+}
+
+function getNonFailureSummary(status: string) {
+  if (status === "PASS") return "Flow completed and the configured success criteria were observed.";
+  if (status === "RUNNING") return "Execution is in progress. Results will update when the persona finishes.";
+  return "Waiting for execution to start.";
+}
+
+function getFailureDiagnosis(testCase: FailureDiagnosisInput, expected: string) {
+  const trace = parseActionTrace(testCase.actionTrace);
+  const failedStep = [...trace].reverse().find((step) => step.oracleResult === "FAIL") || trace.at(-1) || null;
+  const reason = getSpecificFailureReason(testCase, failedStep);
+
+  return {
+    where: describeFailureLocation(testCase, failedStep, reason),
+    why: explainFailure(testCase, failedStep, reason, expected),
+    evidence: getFailureEvidence(testCase, failedStep, expected)
+  };
+}
+
+function describeFailureLocation(testCase: FailureDiagnosisInput, failedStep: TraceStep | null, reason: string) {
+  const normalized = reason.toLowerCase();
+  if (normalized.includes("mobile") || normalized.includes("below the fold") || normalized.includes("touch target")) {
+    return "Mobile viewport: the primary save or submit action was not visible enough to complete.";
+  }
+  if (normalized.includes("billing email") || normalized.includes("account email")) {
+    return "Email form: competing account and billing fields made the correct target ambiguous.";
+  }
+  if (normalized.includes("invalid") || normalized.includes("validation") || normalized.includes("back navigation")) {
+    return "Validation recovery: the flow did not guide the persona back to a successful submission.";
+  }
+  if (normalized.includes("privacy") || normalized.includes("permission") || normalized.includes("newsletter")) {
+    return "Privacy prompt or optional data step: extra choices interrupted the path to completion.";
+  }
+  if (normalized.includes("selector") && normalized.includes("not found")) {
+    return "Success state: the expected confirmation element was missing from the final page.";
+  }
+
+  const location = getUrlLabel(failedStep?.urlAfterAction || testCase.finalUrl);
+  if (failedStep?.chosenAction) {
+    return `${formatAction(failedStep.chosenAction)}${location ? ` on ${location}` : ""}`;
+  }
+  if (location) return `Final page state on ${location}`;
+  return testCase.status === "ERROR" ? "Execution setup or browser session" : "Final page state";
+}
+
+function explainFailure(
+  testCase: FailureDiagnosisInput,
+  failedStep: TraceStep | null,
+  reason: string,
+  expected: string
+) {
+  if (reason && !isGenericOracleFailure(reason, expected)) return reason;
+  if (testCase.failureCategory === "INFRA_FAILURE") {
+    return "The browser run failed before FlowProof could judge the user flow.";
+  }
+  if (reason.toLowerCase().includes("selector")) {
+    return `The run ended without finding the required selector "${expected}".`;
+  }
+  if (reason.toLowerCase().includes("url")) {
+    return `The run ended on a different URL than the configured success criteria expected.`;
+  }
+  if (failedStep?.personaRule) {
+    return `The persona behavior at this step did not produce the required success confirmation "${expected}".`;
+  }
+  return `The flow ended without showing the required success confirmation "${expected}".`;
+}
+
+function getFailureEvidence(testCase: FailureDiagnosisInput, failedStep: TraceStep | null, expected: string) {
+  if (failedStep?.chosenAction) {
+    return `Step ${failedStep.stepNumber}: ${formatAction(failedStep.chosenAction)}`;
+  }
+  const finalLocation = getUrlLabel(testCase.finalUrl);
+  if (finalLocation) return `Final location: ${finalLocation}; expected "${expected}".`;
+  return testCase.failureReason || testCase.agentSummary || "No detailed trace was captured for this failure.";
+}
+
+function getSpecificFailureReason(testCase: FailureDiagnosisInput, failedStep: TraceStep | null) {
+  const candidates = [failedStep?.failureReason, testCase.failureReason, testCase.agentSummary].filter(
+    (value): value is string => Boolean(value && value.trim())
+  );
+  return candidates.find((value) => !isGenericOracleFailure(value)) || candidates[0] || "No failure reason captured.";
+}
+
+function isGenericOracleFailure(value: string, expected?: string) {
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes("page text did not contain") ||
+    normalized.includes("final url did not contain") ||
+    normalized === `the flow ended without showing the required success confirmation "${expected || ""}".`.toLowerCase()
+  );
+}
+
+function getUrlLabel(value: string | null | undefined) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    return truncateText(`${url.pathname}${url.search}` || "/", 90);
+  } catch {
+    return truncateText(value, 90);
+  }
+}
+
+function formatAction(value: string) {
+  return truncateText(value.replace(/\s+/g, " ").trim(), 120);
+}
+
+function truncateText(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
 }
 
 type TraceStep = {

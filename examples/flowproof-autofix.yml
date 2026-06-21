@@ -1,14 +1,14 @@
-name: PersonaProbe Autofix
+name: FlowProof Autofix
 
 on:
   workflow_dispatch:
     inputs:
       fix_context_url:
-        description: Signed PersonaProbe fix-context URL
+        description: Signed FlowProof fix-context URL
         required: true
         type: string
       fix_attempt_id:
-        description: PersonaProbe FixAttempt ID
+        description: FlowProof FixAttempt ID
         required: true
         type: string
 
@@ -61,8 +61,8 @@ jobs:
                   workflowRunUrl: $runUrl,
                   branch: $branch,
                   commitSha: $commitSha,
-                  patchPath: "personaprobe-fix-evidence/\($attemptId).md",
-                  patchSummary: "Placeholder PersonaProbe evidence patch"
+                  patchPath: "flowproof-fix-evidence/\($attemptId).md",
+                  patchSummary: "Placeholder FlowProof evidence patch"
                 }
               }
               + (if $prUrl != "" then {prUrl: $prUrl} else {} end)
@@ -78,7 +78,7 @@ jobs:
 
           on_error() {
             local exit_code=$?
-            callback "FAILED" "" "PersonaProbe autofix workflow failed at line $1 with exit code $exit_code."
+            callback "FAILED" "" "FlowProof autofix workflow failed at line $1 with exit code $exit_code."
             exit "$exit_code"
           }
 
@@ -92,14 +92,14 @@ jobs:
           jq '{version, testCase: .testCase, target: .target, browserbase: .browserbase, sentry: .sentry, actionTraceSteps: (.actionTrace | length)}' fix-context.json
 
           base_branch=$(jq -r '.target.baseBranch // "main"' fix-context.json)
-          branch_name="personaprobe/autofix-${FIX_ATTEMPT_ID}"
-          evidence_file="personaprobe-fix-evidence/${FIX_ATTEMPT_ID}.md"
+          branch_name="flowproof/autofix-${FIX_ATTEMPT_ID}"
+          evidence_file="flowproof-fix-evidence/${FIX_ATTEMPT_ID}.md"
 
-          git config user.name "personaprobe-autofix[bot]"
-          git config user.email "personaprobe-autofix[bot]@users.noreply.github.com"
+          git config user.name "flowproof-autofix[bot]"
+          git config user.email "flowproof-autofix[bot]@users.noreply.github.com"
           git checkout -B "$branch_name"
 
-          mkdir -p personaprobe-fix-evidence
+          mkdir -p flowproof-fix-evidence
 
           node <<'NODE'
           const fs = require("fs");
@@ -107,7 +107,7 @@ jobs:
           const attemptId = process.env.FIX_ATTEMPT_ID;
           const trace = Array.isArray(context.actionTrace) ? context.actionTrace : [];
           const lines = [
-            `# PersonaProbe Fix Evidence`,
+            `# FlowProof Fix Evidence`,
             ``,
             `FixAttempt: ${attemptId}`,
             `TestCase: ${context.testCase?.id ?? "unknown"}`,
@@ -130,31 +130,31 @@ jobs:
             ``,
             `## Next Step`,
             ``,
-            `This placeholder patch proves the PersonaProbe autofix handoff loop. Replace it with the smallest safe product fix and a regression test before marking the draft PR ready.`
+            `This placeholder patch proves the FlowProof autofix handoff loop. Replace it with the smallest safe product fix and a regression test before marking the draft PR ready.`
           ];
 
-          fs.writeFileSync(`personaprobe-fix-evidence/${attemptId}.md`, `${lines.join("\n")}\n`);
+          fs.writeFileSync(`flowproof-fix-evidence/${attemptId}.md`, `${lines.join("\n")}\n`);
           NODE
 
           git add "$evidence_file"
-          git commit -m "chore: add PersonaProbe fix evidence"
+          git commit -m "chore: add FlowProof fix evidence"
           commit_sha=$(git rev-parse HEAD)
           git push --force-with-lease --set-upstream origin "$branch_name"
 
-          pr_body_file="personaprobe-fix-evidence/${FIX_ATTEMPT_ID}-pr-body.md"
+          pr_body_file="flowproof-fix-evidence/${FIX_ATTEMPT_ID}-pr-body.md"
           {
-            echo "PersonaProbe generated this draft PR from FixAttempt ${FIX_ATTEMPT_ID}."
+            echo "FlowProof generated this draft PR from FixAttempt ${FIX_ATTEMPT_ID}."
             echo
             echo "This demo workflow commits a placeholder evidence file so the end-to-end handoff can be verified. Replace the placeholder with the smallest safe UI fix and a regression test before requesting review."
             echo
-            echo "Fix context was fetched from PersonaProbe and redacted before use."
+            echo "Fix context was fetched from FlowProof and redacted before use."
           } > "$pr_body_file"
 
           pr_url=$(gh pr create \
             --draft \
             --base "$base_branch" \
             --head "$branch_name" \
-            --title "PersonaProbe autofix evidence for ${FIX_ATTEMPT_ID}" \
+            --title "FlowProof autofix evidence for ${FIX_ATTEMPT_ID}" \
             --body-file "$pr_body_file")
 
           callback "PR_OPENED" "$pr_url"

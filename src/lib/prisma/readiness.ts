@@ -16,7 +16,7 @@ export function getDatabaseSetupIssue(error: unknown): DatabaseSetupIssue | null
   ) {
     return {
       title: "Database URL is not configured",
-      message: "Set DATABASE_URL and DIRECT_URL in Vercel to hosted Postgres connection strings so PersonaProbe can store projects, runs, test cases, and fix attempts."
+      message: "Set DATABASE_URL and DIRECT_URL in Vercel to hosted Postgres connection strings so FlowProof can store projects, runs, test cases, and fix attempts."
     };
   }
 

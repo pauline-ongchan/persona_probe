@@ -23,7 +23,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     }
 
     if (run.mode !== "DEMO_SAFE") {
-      return NextResponse.json({ error: "Self-healing is currently available for Demo-Safe runs." }, { status: 400 });
+      return NextResponse.json({ error: "Self-healing is currently available for sample-flow runs." }, { status: 400 });
     }
 
     const failedTestCases = run.testCases.filter(

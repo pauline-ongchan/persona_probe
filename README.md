@@ -1,6 +1,6 @@
-# PersonaProbe
+# FlowProof
 
-PersonaProbe runs Browserbase/Stagehand UI-agent probes against target websites, records failures with Sentry context, and can trigger an autofix workflow in the separate website repo.
+FlowProof is a pre-production UI QA tool that uses AI personas to find confusing, inaccessible, or fragile user flows before real users encounter them. Developers define a target page, task, and success criteria; FlowProof runs that flow across behavioral personas, records evidence with Browserbase/Stagehand and Sentry context, and can trigger an autofix workflow in the target website repo.
 
 ## Local setup
 
@@ -13,7 +13,7 @@ npm run prisma:seed
 npm run dev
 ```
 
-PersonaProbe uses Prisma with Postgres. For local development, use any local or hosted Postgres database and set:
+FlowProof uses Prisma with Postgres. For local development, use any local or hosted Postgres database and set:
 
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
@@ -24,7 +24,7 @@ For a fast hosted option, create a Neon or Supabase Postgres database and paste 
 
 ## Autofix PR flow
 
-PersonaProbe does not clone or edit target website repositories. When a failed test case triggers **Create Fix PR**, PersonaProbe:
+FlowProof does not clone or edit target website repositories. When a failed test case triggers **Create Fix PR**, FlowProof:
 
 1. Collects failure evidence from the TestCase, Run, Persona, Browserbase session metadata, Sentry trace metadata, and action trace.
 2. Redacts sensitive fields and stores a `FixAttempt`.
@@ -39,13 +39,13 @@ Required env vars:
 DATABASE_URL=
 DIRECT_URL=
 GITHUB_TOKEN=
-PERSONAPROBE_APP_URL=
+FLOWPROOF_APP_URL=
 FIX_CONTEXT_SECRET=
 ```
 
 `GITHUB_TOKEN` should be server-only and scoped to the target website repo with permission to trigger Actions workflows.
 
-`PERSONAPROBE_APP_URL` must be a plain public URL that GitHub Actions can reach, for example `https://persona-probe.example.com`. Do not paste a Markdown link like `[persona-probe.example.com](https://persona-probe.example.com)`. `localhost` will not work for the full workflow unless you use a public tunnel.
+`FLOWPROOF_APP_URL` must be publicly reachable by GitHub Actions. `localhost` will not work for the full workflow unless you use a public tunnel. Existing deployments can continue using `PERSONAPROBE_APP_URL`.
 
 `FIX_CONTEXT_SECRET` signs fix-context URLs. Generate one with:
 
@@ -55,13 +55,13 @@ openssl rand -hex 32
 
 ## Target repo workflow
 
-Add a workflow like `examples/personaprobe-autofix.yml` to the target website repo at:
+Add a workflow like `examples/flowproof-autofix.yml` to the target website repo at:
 
 ```txt
-.github/workflows/personaprobe-autofix.yml
+.github/workflows/flowproof-autofix.yml
 ```
 
-Then configure a Project in PersonaProbe with:
+Then configure a Project in FlowProof with:
 
 - target URL
 - GitHub owner
@@ -69,7 +69,7 @@ Then configure a Project in PersonaProbe with:
 - base branch
 - workflow file name
 
-The example workflow fetches the signed FixContext, commits a placeholder evidence file at `personaprobe-fix-evidence/<fixAttemptId>.md`, opens a draft PR, and calls back to PersonaProbe with the PR URL. This proves the end-to-end handoff before a real coding agent is wired in.
+The example workflow fetches the signed FixContext, commits a placeholder evidence file at `flowproof-fix-evidence/<fixAttemptId>.md`, opens a draft PR, and calls back to FlowProof with the PR URL. This proves the end-to-end handoff before a real coding agent is wired in.
 
 The target repo workflow needs these permissions:
 
@@ -81,10 +81,10 @@ permissions:
 
 ## Autofix demo checklist
 
-1. Deploy PersonaProbe somewhere GitHub Actions can reach and set `PERSONAPROBE_APP_URL` to that public origin.
-2. Set `DATABASE_URL`, `DIRECT_URL`, `GITHUB_TOKEN`, and `FIX_CONTEXT_SECRET` in PersonaProbe.
-3. Add `.github/workflows/personaprobe-autofix.yml` to the target repo using `examples/personaprobe-autofix.yml`.
-4. Create or choose a PersonaProbe Project that points at the target repo and workflow file.
+1. Deploy FlowProof somewhere GitHub Actions can reach and set `FLOWPROOF_APP_URL` to that public origin.
+2. Set `DATABASE_URL`, `DIRECT_URL`, `GITHUB_TOKEN`, and `FIX_CONTEXT_SECRET` in FlowProof.
+3. Add `.github/workflows/flowproof-autofix.yml` to the target repo using `examples/flowproof-autofix.yml`.
+4. Create or choose a FlowProof Project that points at the target repo and workflow file.
 5. Run a probe, open the run detail page, and click **Create Fix PR** on a failed test case.
 6. Watch the failed test case move through `WORKFLOW_TRIGGERED`, `CONTEXT_FETCHED`, and `PR_OPENED`. The dashboard will show the draft PR link after the callback lands.
 
@@ -96,7 +96,7 @@ The FixContext endpoint is `GET /api/fix-context/:id?token=<signed-token>`. The 
   "prUrl": "https://github.com/owner/repo/pull/123",
   "githubWorkflowRunId": "1234567890",
   "evidence": {
-    "branch": "personaprobe/autofix-fixAttemptId",
+    "branch": "flowproof/autofix-fixAttemptId",
     "commitSha": "abc123",
     "workflowRunUrl": "https://github.com/owner/repo/actions/runs/1234567890"
   }
@@ -105,4 +105,4 @@ The FixContext endpoint is `GET /api/fix-context/:id?token=<signed-token>`. The 
 
 ## Deployment note
 
-Vercel can host the Next.js app. Add `DATABASE_URL` and `DIRECT_URL` in Vercel before deploying for a working app. During `npm run build`, PersonaProbe runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured. If Supabase's direct host is unreachable from Vercel, the build script retries migrations through the Supabase session pooler derived from `DATABASE_URL`.
+Vercel can host the Next.js app. Add `DATABASE_URL` and `DIRECT_URL` in Vercel before deploying for a working app. During `npm run build`, FlowProof runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured. If Supabase's direct host is unreachable from Vercel, the build script retries migrations through the Supabase session pooler derived from `DATABASE_URL`.
