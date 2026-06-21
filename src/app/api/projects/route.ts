@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const githubOwner = String(body.githubOwner || "").trim();
   const githubRepo = String(body.githubRepo || "").trim();
   const baseBranch = String(body.baseBranch || "main").trim();
-  const autofixWorkflow = String(body.autofixWorkflow || "personaprobe-autofix.yml").trim();
+  const autofixWorkflow = String(body.autofixWorkflow || "flowproof-autofix.yml").trim();
   const sentryOrg = optionalString(body.sentryOrg);
   const sentryProject = optionalString(body.sentryProject);
 

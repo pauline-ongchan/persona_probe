@@ -24,7 +24,7 @@ export default async function ProjectsPage() {
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">Settings</p>
         <h1 className="mt-2 text-3xl font-semibold">Projects</h1>
         <p className="mt-2 max-w-3xl text-slate-600">
-          Store the target website repo connection PersonaProbe will use when it triggers autofix workflows.
+          Store the target website and repo connection FlowProof uses when it prepares fix workflows.
         </p>
       </div>
       <ProjectSettingsForm

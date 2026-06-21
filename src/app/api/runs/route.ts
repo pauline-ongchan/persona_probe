@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         {
           error:
             isDemoMode
-              ? "Demo-Safe Mode must be reachable by Browserbase. Deploy to Vercel, set NEXT_PUBLIC_DEMO_BASE_URL to that URL, or enable ALLOW_LOCALHOST_TARGETS for local-only testing."
+              ? "The sample flow must be reachable by Browserbase. Deploy to Vercel, set NEXT_PUBLIC_DEMO_BASE_URL to that URL, or enable ALLOW_LOCALHOST_TARGETS for local-only testing."
               : "Browserbase runs in the cloud and cannot open your machine's localhost. Use a deployed site or public tunnel URL."
         },
         { status: 400 }
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     const run = await prisma.run.create({
       data: {
         projectId,
-        name: isDemoMode ? "Demo-safe account settings probe" : `${new URL(targetUrl).hostname} probe`,
+        name: isDemoMode ? "Sample account settings QA run" : `${new URL(targetUrl).hostname} QA run`,
         mode,
         targetUrl,
         taskGoal,

@@ -58,9 +58,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       github_repo: project.githubRepo
     });
 
-    const appUrl = process.env.PERSONAPROBE_APP_URL?.replace(/\/$/, "");
+    const appUrl = (process.env.FLOWPROOF_APP_URL || process.env.PERSONAPROBE_APP_URL)?.replace(/\/$/, "");
     if (!appUrl) {
-      return NextResponse.json({ error: "PERSONAPROBE_APP_URL is required to create signed fix-context URLs." }, { status: 500 });
+      return NextResponse.json({ error: "FLOWPROOF_APP_URL is required to create signed fix-context URLs." }, { status: 500 });
     }
 
     const cleanContext = redactFixContext(await collectFixContext({ testCaseId: id, projectId: project.id }));

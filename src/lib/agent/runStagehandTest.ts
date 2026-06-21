@@ -234,11 +234,11 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
           const instruction = buildInstruction(input, behaviorContext?.behaviorPolicy);
           const actResult = await Sentry.startSpan(
             {
-              name: "invoke_agent PersonaProbe Stagehand",
+              name: "invoke_agent FlowProof Stagehand",
               op: "gen_ai.invoke_agent",
               attributes: {
                 "gen_ai.request.model": model,
-                "gen_ai.agent.name": "PersonaProbe Stagehand",
+                "gen_ai.agent.name": "FlowProof Stagehand",
                 "persona.key": input.persona.key,
                 "run.id": input.runId,
                 "test_case.id": input.testCaseId

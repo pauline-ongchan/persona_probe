@@ -1,6 +1,6 @@
-# PersonaProbe
+# FlowProof
 
-PersonaProbe runs Browserbase/Stagehand UI-agent probes against target websites, records failures with Sentry context, and can trigger an autofix workflow in the separate website repo.
+FlowProof is a pre-production UI QA tool that uses AI personas to find confusing, inaccessible, or fragile user flows before real users encounter them. Developers define a target page, task, and success criteria; FlowProof runs that flow across behavioral personas, records evidence with Browserbase/Stagehand and Sentry context, and can trigger an autofix workflow in the target website repo.
 
 ## Local setup
 
@@ -13,7 +13,7 @@ npm run prisma:seed
 npm run dev
 ```
 
-PersonaProbe uses Prisma with Postgres. For local development, use any local or hosted Postgres database and set:
+FlowProof uses Prisma with Postgres. For local development, use any local or hosted Postgres database and set:
 
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
@@ -24,7 +24,7 @@ For a fast hosted option, create a Neon or Supabase Postgres database and paste 
 
 ## Autofix PR flow
 
-PersonaProbe does not clone or edit target website repositories. When a failed test case triggers **Create Fix PR**, PersonaProbe:
+FlowProof does not clone or edit target website repositories. When a failed test case triggers **Create Fix PR**, FlowProof:
 
 1. Collects failure evidence from the TestCase, Run, Persona, Browserbase session metadata, Sentry trace metadata, and action trace.
 2. Redacts sensitive fields and stores a `FixAttempt`.
@@ -37,13 +37,13 @@ Required env vars:
 DATABASE_URL=
 DIRECT_URL=
 GITHUB_TOKEN=
-PERSONAPROBE_APP_URL=
+FLOWPROOF_APP_URL=
 FIX_CONTEXT_SECRET=
 ```
 
 `GITHUB_TOKEN` should be server-only and scoped to the target website repo with permission to trigger Actions workflows.
 
-`PERSONAPROBE_APP_URL` must be publicly reachable by GitHub Actions. `localhost` will not work for the full workflow unless you use a public tunnel.
+`FLOWPROOF_APP_URL` must be publicly reachable by GitHub Actions. `localhost` will not work for the full workflow unless you use a public tunnel. Existing deployments can continue using `PERSONAPROBE_APP_URL`.
 
 `FIX_CONTEXT_SECRET` signs fix-context URLs. Generate one with:
 
@@ -53,13 +53,13 @@ openssl rand -hex 32
 
 ## Target repo workflow
 
-Add a workflow like `examples/personaprobe-autofix.yml` to the target website repo at:
+Add a workflow like `examples/flowproof-autofix.yml` to the target website repo at:
 
 ```txt
-.github/workflows/personaprobe-autofix.yml
+.github/workflows/flowproof-autofix.yml
 ```
 
-Then configure a Project in PersonaProbe with:
+Then configure a Project in FlowProof with:
 
 - target URL
 - GitHub owner
@@ -69,4 +69,4 @@ Then configure a Project in PersonaProbe with:
 
 ## Deployment note
 
-Vercel can host the Next.js app. Add `DATABASE_URL` and `DIRECT_URL` in Vercel before deploying for a working app. During `npm run build`, PersonaProbe runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured. If Supabase's direct host is unreachable from Vercel, the build script retries migrations through the Supabase session pooler derived from `DATABASE_URL`.
+Vercel can host the Next.js app. Add `DATABASE_URL` and `DIRECT_URL` in Vercel before deploying for a working app. During `npm run build`, FlowProof runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured. If Supabase's direct host is unreachable from Vercel, the build script retries migrations through the Supabase session pooler derived from `DATABASE_URL`.

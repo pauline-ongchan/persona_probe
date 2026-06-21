@@ -59,7 +59,7 @@ const targetProject = {
   githubOwner: "pauline-ongchan",
   githubRepo: "userpersonatestwebsite",
   baseBranch: "main",
-  autofixWorkflow: "personaprobe-autofix.yml",
+  autofixWorkflow: "flowproof-autofix.yml",
   sentryOrg: null,
   sentryProject: null
 };

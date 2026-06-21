@@ -3,7 +3,7 @@ import { setSafeTags, withSentrySpan } from "@/lib/sentry/withSentrySpan";
 import type { FixContext } from "./types";
 
 const INSTRUCTIONS =
-  "The coding agent should make the smallest safe code change in the target website repo to fix the UI-agent failure. It should not hardcode PersonaProbe-specific behavior. It should add or update a regression test when practical. It should preserve accessibility.";
+  "The coding agent should make the smallest safe code change in the target website repo to fix the UI-agent failure. It should not hardcode FlowProof-specific behavior. It should add or update a regression test when practical. It should preserve accessibility.";
 
 export async function collectFixContext({
   testCaseId,

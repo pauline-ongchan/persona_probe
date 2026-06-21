@@ -22,13 +22,13 @@ export default async function HomePage() {
     <main className="mx-auto max-w-7xl px-5 py-8">
       <section className="grid gap-8 lg:grid-cols-[0.9fr_1.4fr]">
         <div className="pt-2">
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-moss">Hackathon MVP</p>
+          <p className="text-sm font-medium uppercase tracking-[0.18em] text-moss">Pre-production UI QA</p>
           <h1 className="mt-3 max-w-2xl text-5xl font-semibold leading-tight">
-            Stress-test AI browser agents across behavioral personas.
+            Find fragile user flows before real users do.
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
-            PersonaProbe runs Browserbase Stagehand sessions with persona-conditioned instructions, judges the outcome,
-            and ranks the riskiest task-persona combinations.
+            FlowProof lets developers define a target page, task, and success criteria, then runs the flow across
+            behavioral personas to catch confusing, inaccessible, or brittle moments before shipping.
           </p>
           <div className="mt-8 grid grid-cols-3 gap-3 text-center">
             <div className="rounded border border-slate-200 bg-white p-4">
@@ -37,11 +37,11 @@ export default async function HomePage() {
             </div>
             <div className="rounded border border-slate-200 bg-white p-4">
               <span className="block text-2xl font-semibold">4</span>
-              <span className="text-xs text-slate-500">oracles</span>
+              <span className="text-xs text-slate-500">criteria types</span>
             </div>
             <div className="rounded border border-slate-200 bg-white p-4">
               <span className="block text-2xl font-semibold">1</span>
-              <span className="text-xs text-slate-500">demo flow</span>
+              <span className="text-xs text-slate-500">sample flow</span>
             </div>
           </div>
         </div>

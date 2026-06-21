@@ -24,7 +24,7 @@ export function DatabaseSetupNotice({ issue }: { issue: DatabaseSetupIssue }) {
         <div className="rounded border border-slate-200 bg-slate-50 p-4">
           <p className="font-medium">2. Set env vars</p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Add DATABASE_URL, DIRECT_URL, GITHUB_TOKEN, PERSONAPROBE_APP_URL, and FIX_CONTEXT_SECRET in Vercel.
+            Add DATABASE_URL, DIRECT_URL, GITHUB_TOKEN, FLOWPROOF_APP_URL, and FIX_CONTEXT_SECRET in Vercel.
           </p>
         </div>
         <div className="rounded border border-slate-200 bg-slate-50 p-4">
