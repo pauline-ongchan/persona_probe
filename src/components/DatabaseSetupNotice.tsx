@@ -18,7 +18,7 @@ export function DatabaseSetupNotice({ issue }: { issue: DatabaseSetupIssue }) {
         <div className="rounded border border-slate-200 bg-slate-50 p-4">
           <p className="font-medium">1. Add a database</p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Use a hosted database for Vercel. SQLite is only for local development.
+            Use a hosted Postgres database for Vercel, such as Neon or Supabase.
           </p>
         </div>
         <div className="rounded border border-slate-200 bg-slate-50 p-4">

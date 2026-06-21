@@ -7,16 +7,19 @@ PersonaProbe runs Browserbase/Stagehand UI-agent probes against target websites,
 ```bash
 npm install
 cp .env.example .env
+npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
 npm run dev
 ```
 
-The local MVP uses SQLite:
+PersonaProbe uses Prisma with Postgres. For local development, use any local or hosted Postgres database and set:
 
 ```bash
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 ```
+
+For a fast hosted option, create a Neon or Supabase Postgres database and paste its connection string into `.env`.
 
 ## Autofix PR flow
 
@@ -30,6 +33,7 @@ PersonaProbe does not clone or edit target website repositories. When a failed t
 Required env vars:
 
 ```bash
+DATABASE_URL=
 GITHUB_TOKEN=
 PERSONAPROBE_APP_URL=
 FIX_CONTEXT_SECRET=
@@ -63,4 +67,4 @@ Then configure a Project in PersonaProbe with:
 
 ## Deployment note
 
-Vercel can host the Next.js app, but the local SQLite database is not suitable for durable Vercel writes. For a production deployment, use a hosted database and update the Prisma datasource accordingly.
+Vercel can host the Next.js app. Add `DATABASE_URL` in Vercel before deploying for a working app. During `npm run build`, PersonaProbe runs `prisma migrate deploy` and seeds the default personas when `DATABASE_URL` is configured.

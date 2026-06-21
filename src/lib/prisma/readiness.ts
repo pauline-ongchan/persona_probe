@@ -9,11 +9,12 @@ export function getDatabaseSetupIssue(error: unknown): DatabaseSetupIssue | null
   if (
     message.includes("Environment variable not found: DATABASE_URL") ||
     message.includes("Error validating datasource") ||
+    message.includes("the URL must start with the protocol") ||
     message.includes("DATABASE_URL")
   ) {
     return {
       title: "Database URL is not configured",
-      message: "Set DATABASE_URL in Vercel so PersonaProbe can store projects, runs, test cases, and fix attempts."
+      message: "Set DATABASE_URL in Vercel to a hosted Postgres connection string so PersonaProbe can store projects, runs, test cases, and fix attempts."
     };
   }
 
