@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Run" ADD COLUMN "mode" TEXT NOT NULL DEFAULT 'REAL_WEBSITE';
+
+-- AlterTable
+ALTER TABLE "TestCase" ADD COLUMN "failureCategory" TEXT;
+ALTER TABLE "TestCase" ADD COLUMN "actionTrace" TEXT NOT NULL DEFAULT '[]';

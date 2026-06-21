@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+enum TestCaseStatus {
+  PENDING
+  RUNNING
+  PASS
+  FAIL
+  ERROR
+}
+
+enum OracleType {
+  URL_CONTAINS
+  TEXT_CONTAINS
+  SELECTOR_EXISTS
+  LLM_JUDGE
+}
+
+enum RunMode {
+  REAL_WEBSITE
+  DEMO_SAFE
+}
+
+enum FailureCategory {
+  PERSONA_FAILURE
+  AGENT_FAILURE
+  UI_AMBIGUITY
+  BOT_BLOCKED
+  TIMEOUT
+  INFRA_FAILURE
+  ORACLE_FAILURE
+  UNKNOWN
+}
+
+model Run {
+  id          String     @id @default(cuid())
+  projectId   String?
+  name        String
+  mode        RunMode    @default(REAL_WEBSITE)
+  targetUrl   String
+  taskGoal    String
+  oracleType  OracleType
+  oracleValue String
+  status      RunStatus  @default(PENDING)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  testCases   TestCase[]
+
+  @@index([projectId])
+}
+
+model Project {
+  id               String       @id @default(cuid())
+  name             String
+  targetUrl        String
+  githubOwner      String
+  githubRepo       String
+  baseBranch       String       @default("main")
+  autofixWorkflow  String       @default("personaprobe-autofix.yml")
+  sentryOrg        String?
+  sentryProject    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  runs             Run[]
+  fixAttempts      FixAttempt[]
+}
+
+model Persona {
+  id             String     @id @default(cuid())
+  key            String     @unique
+  name           String
+  description    String
+  behaviorPrompt String
+  riskWeight     Float      @default(0.5)
+  testCases      TestCase[]
+}
+
+model TestCase {
+  id                    String         @id @default(cuid())
+  runId                 String
+  personaId             String
+  status                TestCaseStatus @default(PENDING)
+  priorityScore         Float          @default(0)
+  browserbaseSessionId  String?
+  browserbaseSessionUrl String?
+  sentryTraceId         String?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  durationMs            Int?
+  agentSummary          String?
+  failureReason         String?
+  failureCategory       FailureCategory?
+  finalUrl              String?
+  finalTextSample       String?
+  screenshotUrl         String?
+  actionTrace           String         @default("[]")
+  rawLogs               String         @default("[]")
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  run                   Run            @relation(fields: [runId], references: [id], onDelete: Cascade)
+  persona               Persona        @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  fixAttempts           FixAttempt[]
+
+  @@index([runId])
+  @@index([personaId])
+  @@index([status])
+}
+
+model FixAttempt {
+  id                  String   @id @default(cuid())
+  testCaseId          String
+  projectId           String
+  status              String   @default("PENDING")
+  fixContextJson      Json
+  fixContextToken     String
+  githubWorkflowRunId String?
+  prUrl               String?
+  errorMessage        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  testCase            TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([testCaseId])
+  @@index([projectId])
+  @@index([status])
+}
