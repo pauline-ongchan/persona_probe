@@ -1,0 +1,36 @@
+name: PersonaProbe Autofix
+
+on:
+  workflow_dispatch:
+    inputs:
+      fix_context_url:
+        description: Signed PersonaProbe fix-context URL
+        required: true
+        type: string
+      fix_attempt_id:
+        description: PersonaProbe FixAttempt ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+
+      - name: Fetch PersonaProbe fix context
+        env:
+          FIX_CONTEXT_URL: ${{ inputs.fix_context_url }}
+        run: |
+          curl --fail --silent --show-error "$FIX_CONTEXT_URL" > fix-context.json
+          jq '{version, testCase: .testCase, target: .target, browserbase: .browserbase, sentry: .sentry, actionTraceSteps: (.actionTrace | length)}' fix-context.json
+
+      - name: Coding agent stub
+        run: |
+          echo "TODO: run coding agent for PersonaProbe FixAttempt ${{ inputs.fix_attempt_id }}"
+          echo "The agent should read fix-context.json, make the smallest safe change, add tests when practical, and open a draft PR."
