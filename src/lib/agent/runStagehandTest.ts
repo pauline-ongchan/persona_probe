@@ -1,6 +1,16 @@
 import * as Sentry from "@sentry/nextjs";
 import type { FailureCategory, OracleType, Persona, RunMode } from "@prisma/client";
 import { evaluateOracle } from "@/lib/oracle/evaluateOracle";
+import { collectPageAuditSummary } from "@/lib/personas/collectPageAuditSummary";
+import { resolveBehaviorProfile } from "@/lib/personas/resolveBehaviorProfile";
+import { sampleBehaviorPolicy } from "@/lib/personas/sampleBehaviorPolicy";
+import type {
+  BehaviorPolicy,
+  PageAuditSummary,
+  PersonaBehaviorProfile,
+  PersonaBehaviorRiskScore
+} from "@/lib/personas/types";
+import { scorePersonaBehaviorRisk } from "@/lib/scoring/scorePersonaBehaviorRisk";
 import { withSentrySpan } from "@/lib/sentry/withSentrySpan";
 
 type StagehandPage = {
@@ -24,6 +34,7 @@ type StagehandPage = {
   };
   url: () => string;
   screenshot?: (options?: { path?: string; fullPage?: boolean }) => Promise<Buffer>;
+  evaluate?: <T>(pageFunction: () => T | Promise<T>) => Promise<T>;
 };
 
 type StagehandInstance = {
@@ -58,7 +69,7 @@ export type StagehandTestInput = {
   mode: RunMode;
   targetUrl: string;
   taskGoal: string;
-  persona: Pick<Persona, "key" | "name" | "behaviorPrompt">;
+  persona: Pick<Persona, "key" | "name" | "description" | "behaviorPrompt" | "riskWeight">;
   oracle: {
     type: OracleType;
     value: string;
@@ -94,6 +105,13 @@ export type TestCaseResult = {
   rawLogs: unknown[];
 };
 
+type BehaviorRunContext = {
+  profile: PersonaBehaviorProfile;
+  pageAuditSummary: PageAuditSummary;
+  behaviorPolicy: BehaviorPolicy;
+  behaviorRisk: PersonaBehaviorRiskScore;
+};
+
 export async function runStagehandTest(input: StagehandTestInput): Promise<TestCaseResult> {
   const startedAt = Date.now();
   const traceId = Sentry.getActiveSpan()?.spanContext().traceId ?? null;
@@ -105,6 +123,7 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
   let screenshotUrl: string | null = null;
   let browserbaseSessionId: string | null = null;
   let actionTrace: ActionTraceStep[] = [];
+  let behaviorContext = buildBehaviorRunContext(input, { url: input.targetUrl });
 
   return withSentrySpan(
     "persona_test_case",
@@ -114,7 +133,8 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
       "persona.key": input.persona.key,
       "run.mode": input.mode,
       "target.url": input.targetUrl,
-      "oracle.type": input.oracle.type
+      "oracle.type": input.oracle.type,
+      "behavior_policies.enabled": Boolean(behaviorContext)
     },
     async () => {
       Sentry.setTags({
@@ -179,7 +199,12 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
         }
         const activeStagehand = stagehand;
 
-        if (input.persona.key === "mobile-first" && page.setViewportSize) {
+        if (behaviorContext?.behaviorPolicy.viewport.type === "mobile" && page.setViewportSize) {
+          await page.setViewportSize({
+            width: behaviorContext.behaviorPolicy.viewport.width,
+            height: behaviorContext.behaviorPolicy.viewport.height
+          });
+        } else if (!behaviorContext && input.persona.key === "mobile-first" && page.setViewportSize) {
           await page.setViewportSize({ width: 390, height: 844 });
         }
 
@@ -197,11 +222,16 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
 
         await dismissLocalTunnelInterstitial(page, input.targetUrl, logs);
 
+        if (behaviorContext) {
+          const pageAuditSummary = await collectPageAuditSummary(page);
+          behaviorContext = buildBehaviorRunContext(input, pageAuditSummary);
+        }
+
         if (input.mode === "DEMO_SAFE") {
           const demoResult = await executeDemoSafePolicy(page, input, logs);
           actionTrace = demoResult.actionTrace;
         } else {
-          const instruction = buildInstruction(input);
+          const instruction = buildInstruction(input, behaviorContext?.behaviorPolicy);
           const actResult = await Sentry.startSpan(
             {
               name: "invoke_agent PersonaProbe Stagehand",
@@ -219,9 +249,10 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
                 "browserbase.stagehand.agent",
                 {
                   "persona.key": input.persona.key,
-                  "task.length": input.taskGoal.length
+                  "task.length": input.taskGoal.length,
+                  "behavior_policies.enabled": Boolean(behaviorContext)
                 },
-                async () => executePersonaTask(activeStagehand, page, instruction, model, input)
+                async () => executePersonaTask(activeStagehand, page, instruction, model, input, behaviorContext?.behaviorPolicy)
               )
           );
           logs.push({ type: "agent_result", value: summarizeUnknown(actResult) });
@@ -281,7 +312,7 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
           finalTextSample,
           screenshotUrl,
           actionTrace,
-          rawLogs: truncateLogs(logs)
+          rawLogs: truncateLogs(logs, behaviorContext)
         };
       } catch (error) {
         Sentry.captureException(error, {
@@ -308,7 +339,7 @@ export async function runStagehandTest(input: StagehandTestInput): Promise<TestC
           finalTextSample,
           screenshotUrl,
           actionTrace,
-          rawLogs: truncateLogs(logs)
+          rawLogs: truncateLogs(logs, behaviorContext)
         };
       } finally {
         if (stagehand) {
@@ -646,12 +677,19 @@ async function fillByTestId(page: StagehandPage, testId: string, value: string) 
   await field.fill(value, { timeout: 6_000 });
 }
 
-function buildInstruction(input: StagehandTestInput) {
+function buildInstruction(input: StagehandTestInput, behaviorPolicy?: BehaviorPolicy) {
+  const behaviorPolicyBlock = behaviorPolicy
+    ? `
+
+Benchmark-aware behavior policy:
+${behaviorPolicy.instructions}`
+    : "";
+
   return `You are testing whether an AI browser agent can complete this UI task under a specific user persona.
 
 Persona:
 ${input.persona.name}
-${input.persona.behaviorPrompt}
+${input.persona.behaviorPrompt}${behaviorPolicyBlock}
 
 Task:
 ${input.taskGoal}
@@ -669,32 +707,58 @@ async function executePersonaTask(
   page: StagehandPage,
   instruction: string,
   model: string,
-  input: StagehandTestInput
+  input: StagehandTestInput,
+  behaviorPolicy?: BehaviorPolicy
 ) {
   if (model.startsWith("google/")) {
-    return executeActSequence(page, instruction, input);
+    return executeActSequence(page, instruction, input, behaviorPolicy);
   }
 
   if (stagehand.agent) {
     const agent = stagehand.agent({
       executionModel: model,
-      instructions:
-        "You are a browser automation agent. Complete the requested task end-to-end. Do not stop after a single field edit if more clicks or form submissions are required."
+      instructions: behaviorPolicy
+        ? "You are a browser automation agent. Complete the requested task end-to-end while following the included benchmark-aware behavior policy. Do not stop after a single field edit if more clicks or form submissions are required unless the behavior policy says the persona would be clearly blocked."
+        : "You are a browser automation agent. Complete the requested task end-to-end. Do not stop after a single field edit if more clicks or form submissions are required."
     });
 
     return agent.execute({
       instruction,
-      maxSteps: 8,
+      maxSteps: behaviorPolicy?.maxSteps ?? 8,
       autoScreenshot: true,
-      waitBetweenActions: 400
+      waitBetweenActions: behaviorPolicy?.waitBetweenActionsMs ?? 400
     });
   }
 
   return page.act(instruction);
 }
 
-async function executeActSequence(page: StagehandPage, instruction: string, input: StagehandTestInput) {
+async function executeActSequence(
+  page: StagehandPage,
+  instruction: string,
+  input: StagehandTestInput,
+  behaviorPolicy?: BehaviorPolicy
+) {
   const actions: unknown[] = [];
+  const prompts = getActSequencePrompts(instruction, behaviorPolicy);
+
+  for (const prompt of prompts) {
+    if (await isOracleProbablySatisfied(page, input)) {
+      break;
+    }
+
+    const result = await page.act(prompt);
+    actions.push(result);
+  }
+
+  return {
+    success: await isOracleProbablySatisfied(page, input),
+    mode: "sequential_act",
+    actions
+  };
+}
+
+function getActSequencePrompts(instruction: string, behaviorPolicy?: BehaviorPolicy) {
   const prompts = [
     `${instruction}
 
@@ -723,20 +787,15 @@ Step focus:
 - Stop if the task is already complete or blocked.`
   ];
 
-  for (const prompt of prompts) {
-    if (await isOracleProbablySatisfied(page, input)) {
-      break;
-    }
+  if (!behaviorPolicy) return prompts;
 
-    const result = await page.act(prompt);
-    actions.push(result);
-  }
+  return prompts.slice(0, getActPromptLimit(behaviorPolicy, prompts.length));
+}
 
-  return {
-    success: await isOracleProbablySatisfied(page, input),
-    mode: "sequential_act",
-    actions
-  };
+function getActPromptLimit(behaviorPolicy: BehaviorPolicy, maxPrompts: number) {
+  if (behaviorPolicy.maxSteps <= 5 || behaviorPolicy.retryLikelihood < 0.18) return Math.min(2, maxPrompts);
+  if (behaviorPolicy.maxSteps <= 8 || behaviorPolicy.retryLikelihood < 0.35) return Math.min(3, maxPrompts);
+  return maxPrompts;
 }
 
 async function isOracleProbablySatisfied(page: StagehandPage, input: StagehandTestInput) {
@@ -989,6 +1048,62 @@ function getModelApiKey() {
   );
 }
 
+function buildBehaviorRunContext(input: StagehandTestInput, pageAuditSummary: PageAuditSummary): BehaviorRunContext | null {
+  if (!isBehaviorPoliciesEnabled()) return null;
+
+  const profile = resolveBehaviorProfile(input.persona);
+  const behaviorPolicy = sampleBehaviorPolicy({
+    persona: profile,
+    seed: `${input.runId}:${input.testCaseId}:${input.persona.key}`,
+    pageAudit: pageAuditSummary
+  });
+  const behaviorRisk = scorePersonaBehaviorRisk({
+    persona: profile,
+    behaviorPolicy,
+    pageAudit: pageAuditSummary,
+    taskGoal: input.taskGoal
+  });
+
+  return {
+    profile,
+    pageAuditSummary,
+    behaviorPolicy,
+    behaviorRisk
+  };
+}
+
+function isBehaviorPoliciesEnabled() {
+  return ["1", "true", "yes", "on"].includes((process.env.ENABLE_BEHAVIOR_POLICIES || "").toLowerCase());
+}
+
+function createBehaviorSnapshotLog(context: BehaviorRunContext) {
+  return {
+    type: "behavior_policy_snapshot",
+    enabled: true,
+    profileKey: context.profile.key,
+    profileName: context.profile.name,
+    pageAuditSummary: context.pageAuditSummary,
+    behaviorPolicy: {
+      maxSteps: context.behaviorPolicy.maxSteps,
+      retryLikelihood: context.behaviorPolicy.retryLikelihood,
+      scrollLikelihood: context.behaviorPolicy.scrollLikelihood,
+      typoLikelihood: context.behaviorPolicy.typoLikelihood,
+      hesitationLikelihood: context.behaviorPolicy.hesitationLikelihood,
+      refusalLikelihood: context.behaviorPolicy.refusalLikelihood,
+      waitBetweenActionsMs: context.behaviorPolicy.waitBetweenActionsMs,
+      viewport: context.behaviorPolicy.viewport,
+      inputMode: context.behaviorPolicy.inputMode,
+      readingStyle: context.behaviorPolicy.readingStyle,
+      warnings: context.behaviorPolicy.warnings,
+      instructions: truncateText(context.behaviorPolicy.instructions, 2600)
+    },
+    behaviorRiskScore: context.behaviorRisk.overallRiskScore,
+    behaviorRiskExplanation: context.behaviorRisk.explanation,
+    categoryScores: context.behaviorRisk.categoryScores,
+    topRiskFactors: context.behaviorRisk.topRiskFactors
+  };
+}
+
 function redactAuxiliary(auxiliary: StagehandLogLine["auxiliary"]) {
   if (!auxiliary) return undefined;
 
@@ -1007,8 +1122,10 @@ function summarizeUnknown(value: unknown) {
   return truncateText(JSON.stringify(value, null, 2) || String(value), 1200);
 }
 
-function truncateLogs(logs: unknown[]) {
-  return logs.map((log) => summarizeUnknown(log));
+function truncateLogs(logs: unknown[], behaviorContext: BehaviorRunContext | null) {
+  const summarizedLogs = logs.map((log) => summarizeUnknown(log));
+  if (!behaviorContext) return summarizedLogs;
+  return [createBehaviorSnapshotLog(behaviorContext), ...summarizedLogs];
 }
 
 function truncateText(value: string, max: number) {

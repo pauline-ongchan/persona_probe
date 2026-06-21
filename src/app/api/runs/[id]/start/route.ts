@@ -65,7 +65,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
             finalTextSample: result.finalTextSample,
             screenshotUrl: result.screenshotUrl,
             actionTrace: JSON.stringify(result.actionTrace).slice(0, 120000),
-            rawLogs: JSON.stringify(result.rawLogs).slice(0, 16000)
+            rawLogs: JSON.stringify(result.rawLogs).slice(0, 60000)
           }
         });
       } catch (error) {
