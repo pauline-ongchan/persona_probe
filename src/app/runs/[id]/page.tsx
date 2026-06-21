@@ -419,6 +419,9 @@ function getFailureDiagnosis(testCase: FailureDiagnosisInput, expected: string) 
 
 function describeFailureLocation(testCase: FailureDiagnosisInput, failedStep: TraceStep | null, reason: string) {
   const normalized = reason.toLowerCase();
+  if (isMissingDemoModalControl(normalized)) {
+    return "Sample flow target: the page did not expose the expected privacy modal control.";
+  }
   if (normalized.includes("mobile") || normalized.includes("below the fold") || normalized.includes("touch target")) {
     return "Mobile viewport: the primary save or submit action was not visible enough to complete.";
   }
@@ -449,6 +452,9 @@ function explainFailure(
   reason: string,
   expected: string
 ) {
+  if (isMissingDemoModalControl(reason.toLowerCase())) {
+    return "FlowProof expected the built-in sample page with a privacy modal, but this run appears to be pointed at a page without that modal. Create a new sample run after deployment, or set NEXT_PUBLIC_DEMO_BASE_URL to this FlowProof app origin.";
+  }
   if (reason && !isGenericOracleFailure(reason, expected)) return reason;
   if (testCase.failureCategory === "INFRA_FAILURE") {
     return "The browser run failed before FlowProof could judge the user flow.";
@@ -487,6 +493,13 @@ function isGenericOracleFailure(value: string, expected?: string) {
     normalized.includes("page text did not contain") ||
     normalized.includes("final url did not contain") ||
     normalized === `the flow ended without showing the required success confirmation "${expected || ""}".`.toLowerCase()
+  );
+}
+
+function isMissingDemoModalControl(normalizedReason: string) {
+  return (
+    normalizedReason.includes("timeout") &&
+    (normalizedReason.includes("modal-allow") || normalizedReason.includes("modal-reject"))
   );
 }
 

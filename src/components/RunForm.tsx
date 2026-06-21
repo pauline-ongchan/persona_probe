@@ -37,7 +37,7 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
     if (process.env.NEXT_PUBLIC_DEMO_BASE_URL) {
       return `${process.env.NEXT_PUBLIC_DEMO_BASE_URL.replace(/\/$/, "")}/demo-app/account-settings`;
     }
-    return "https://userpersonatestwebsite.vercel.app/demo-app/account-settings";
+    return `${window.location.origin}/demo-app/account-settings`;
   }, []);
 
   const isDemoMode = mode === "DEMO_SAFE";

@@ -111,6 +111,10 @@ function getDemoTargetUrl() {
     return `${process.env.NEXT_PUBLIC_DEMO_BASE_URL.replace(/\/$/, "")}/demo-app/account-settings`;
   }
 
+  if (process.env.FLOWPROOF_APP_URL) {
+    return `${process.env.FLOWPROOF_APP_URL.replace(/\/$/, "")}/demo-app/account-settings`;
+  }
+
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}/demo-app/account-settings`;
   }
