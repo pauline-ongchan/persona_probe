@@ -54,7 +54,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
 
     const responseBody = buildFixContextResponse({
-      appUrl: process.env.PERSONAPROBE_APP_URL,
+      appUrl: process.env.FLOWPROOF_APP_URL || process.env.PERSONAPROBE_APP_URL,
       fixAttemptId: fixAttempt.id,
       fixContext: fixAttempt.fixContextJson as unknown as FixContext,
       requestUrl: request.url,

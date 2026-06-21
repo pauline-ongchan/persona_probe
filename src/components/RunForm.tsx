@@ -48,31 +48,36 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
     setIsSubmitting(true);
     setError(null);
 
-    const response = await fetch("/api/runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode,
-        projectId: projectId || undefined,
-        targetUrl: targetUrl || (!isDemoMode ? selectedProject?.targetUrl : fallbackUrl),
-        taskGoal: isDemoMode
-          ? "Change the account email to test@example.com and reach the confirmation screen."
-          : taskGoal,
-        oracleType: isDemoMode ? "TEXT_CONTAINS" : oracleType,
-        oracleValue: isDemoMode ? "Email updated successfully" : oracleValue,
-        personaKeys: selected,
-        maxRuns
-      })
-    });
+    try {
+      const response = await fetch("/api/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          projectId: projectId || undefined,
+          targetUrl: targetUrl || (!isDemoMode ? selectedProject?.targetUrl : fallbackUrl),
+          taskGoal: isDemoMode
+            ? "Change the account email to test@example.com and reach the confirmation screen."
+            : taskGoal,
+          oracleType: isDemoMode ? "TEXT_CONTAINS" : oracleType,
+          oracleValue: isDemoMode ? "Email updated successfully" : oracleValue,
+          personaKeys: selected,
+          maxRuns
+        })
+      });
 
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error || "Could not create run.");
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error || "Could not create run.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      router.push(`/runs/${payload.run.id}`);
+    } catch {
+      setError("Could not create run.");
       setIsSubmitting(false);
-      return;
     }
-
-    router.push(`/runs/${payload.run.id}`);
   }
 
   function togglePersona(key: string) {
@@ -84,7 +89,7 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
   return (
     <form onSubmit={submitRun} className="space-y-6">
       <section>
-        <span className="text-sm font-medium text-slate-700">Mode</span>
+        <span className="text-sm font-medium text-slate-700">Flow source</span>
         <div className="mt-2 grid gap-3 md:grid-cols-2">
           <button
             className={`focus-ring flex items-start gap-3 rounded border p-4 text-left ${
@@ -95,9 +100,9 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
           >
             <FlaskConical className="mt-0.5 h-5 w-5 text-moss" />
             <span>
-              <span className="block font-medium">Demo-Safe Mode</span>
+              <span className="block font-medium">Sample flow</span>
               <span className="mt-1 block text-sm leading-5 text-slate-600">
-                Runs the built-in account settings trap flow with a fixed oracle.
+                Runs a safe account-settings flow with fixed success criteria.
               </span>
             </span>
           </button>
@@ -110,9 +115,9 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
           >
             <Globe2 className="mt-0.5 h-5 w-5 text-ink" />
             <span>
-              <span className="block font-medium">Real Website Mode</span>
+              <span className="block font-medium">Target website</span>
               <span className="mt-1 block text-sm leading-5 text-slate-600">
-                Uses Browserbase on a public URL with configurable task and oracle.
+                Tests a public URL with your task and success criteria.
               </span>
             </span>
           </button>
@@ -221,9 +226,6 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
                   <span>
                     <span className="block font-medium">{persona.name}</span>
                     <span className="mt-1 block text-sm leading-5 text-slate-600">{persona.description}</span>
-                    <span className="mt-2 inline-flex items-center rounded bg-amber/15 px-2 py-1 text-xs font-medium text-amber">
-                      Risk {persona.riskWeight.toFixed(2)}
-                    </span>
                   </span>
                 </span>
               </label>
@@ -236,20 +238,25 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
         <div className="flex items-start gap-3 rounded border border-slate-200 bg-white p-4">
           <FlaskConical className="mt-0.5 h-5 w-5 text-moss" />
           <p className="text-sm text-slate-600">
-            Demo-Safe Mode targets `/demo-app/account-settings` and forces the account email oracle.
+            Sample flow checks whether the account email reaches a clear confirmation state.
           </p>
         </div>
         <div className="flex items-start gap-3 rounded border border-slate-200 bg-white p-4">
           <Shield className="mt-0.5 h-5 w-5 text-moss" />
-          <p className="text-sm text-slate-600">Sentry receives trace metadata, not full target-page content.</p>
+          <p className="text-sm text-slate-600">FlowProof stores run evidence, trace links, and persona outcomes.</p>
         </div>
         <div className="flex items-start gap-3 rounded border border-coral/30 bg-coral/10 p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 text-coral" />
-          <p className="text-sm text-slate-700">Do not test production apps with real credentials during demo.</p>
+          <p className="text-sm text-slate-700">Use staging data or disposable accounts for pre-production checks.</p>
         </div>
       </div>
 
       {error ? <p className="rounded border border-coral/30 bg-coral/10 px-3 py-2 text-sm text-coral">{error}</p> : null}
+      {isSubmitting ? (
+        <p className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          Creating a FlowProof run and preparing persona test cases...
+        </p>
+      ) : null}
 
       <button
         className="focus-ring inline-flex items-center gap-2 rounded bg-ink px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -257,7 +264,7 @@ export function RunForm({ personas, projects }: { personas: Persona[]; projects:
         type="submit"
       >
         <Play className="h-4 w-4" />
-        {isSubmitting ? "Creating..." : "Create run"}
+        {isSubmitting ? "Creating run..." : "Create QA run"}
       </button>
     </form>
   );

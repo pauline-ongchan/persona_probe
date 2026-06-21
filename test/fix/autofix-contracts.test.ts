@@ -49,14 +49,14 @@ test("fix-context tokens round-trip only with the configured secret", () => {
 
 test("FixContext response includes an authenticated callback contract", () => {
   const response = buildFixContextResponse({
-    appUrl: "https://personaprobe.example.com/",
+    appUrl: "https://flowproof.example.com/",
     fixAttemptId: "fix-attempt-1",
     fixContext: sampleFixContext,
     requestUrl: "https://ignored.example.com/api/fix-context/fix-attempt-1",
     token: "signed-token"
   });
 
-  assert.equal(response.callback.url, "https://personaprobe.example.com/api/fix-attempts/fix-attempt-1/callback");
+  assert.equal(response.callback.url, "https://flowproof.example.com/api/fix-attempts/fix-attempt-1/callback");
   assert.equal(response.callback.method, "POST");
   assert.equal(response.callback.authHeader, "Authorization");
   assert.equal(response.callback.bearerToken, "signed-token");
@@ -96,7 +96,7 @@ test("callback payload validation requires PR URLs for PR_OPENED", () => {
     prUrl: "https://github.com/owner/repo/pull/123",
     githubWorkflowRunId: "987654321",
     evidence: {
-      branch: "personaprobe/autofix-fix-attempt-1",
+      branch: "flowproof/autofix-fix-attempt-1",
       commitSha: "abc123"
     }
   });

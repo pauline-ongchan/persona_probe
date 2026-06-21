@@ -71,7 +71,7 @@ model Project {
   githubOwner     String
   githubRepo      String
   baseBranch      String       @default("main")
-  autofixWorkflow String       @default("personaprobe-autofix.yml")
+  autofixWorkflow String       @default("flowproof-autofix.yml")
   sentryOrg       String?
   sentryProject   String?
   createdAt       DateTime     @default(now())

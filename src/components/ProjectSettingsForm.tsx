@@ -24,7 +24,7 @@ export function ProjectSettingsForm({ projects }: { projects: Project[] }) {
     githubOwner: "",
     githubRepo: "",
     baseBranch: "main",
-    autofixWorkflow: "personaprobe-autofix.yml",
+    autofixWorkflow: "flowproof-autofix.yml",
     sentryOrg: "",
     sentryProject: ""
   });
@@ -55,7 +55,7 @@ export function ProjectSettingsForm({ projects }: { projects: Project[] }) {
       githubOwner: "",
       githubRepo: "",
       baseBranch: "main",
-      autofixWorkflow: "personaprobe-autofix.yml",
+      autofixWorkflow: "flowproof-autofix.yml",
       sentryOrg: "",
       sentryProject: ""
     });

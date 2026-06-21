@@ -21,7 +21,7 @@ CREATE TABLE "Project" (
     "githubOwner" TEXT NOT NULL,
     "githubRepo" TEXT NOT NULL,
     "baseBranch" TEXT NOT NULL DEFAULT 'main',
-    "autofixWorkflow" TEXT NOT NULL DEFAULT 'personaprobe-autofix.yml',
+    "autofixWorkflow" TEXT NOT NULL DEFAULT 'flowproof-autofix.yml',
     "sentryOrg" TEXT,
     "sentryProject" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
