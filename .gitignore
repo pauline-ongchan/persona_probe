@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+.next
+out
+dist
+.env
+.env*.local
+.env.sentry-build-plugin
+dev.db
+dev.db-journal
+prisma/dev.db
+prisma/dev.db-journal
+*.tsbuildinfo
