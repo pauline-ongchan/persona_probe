@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { scoreTestCase } from "@/lib/ranking/scoreTestCase";
+import { getSelfHealedDemoAccountSettingsTargetUrl } from "@/lib/runs/demoTarget";
 import { encodeSelfHealPlan, generateSelfHealPlan } from "@/lib/self-healing/generateSelfHealPlan";
 import { withSentrySpan } from "@/lib/sentry/withSentrySpan";
 
-export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
   return withSentrySpan("run.self_heal", { "run.id": id }, async () => {
@@ -42,7 +43,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       oracleType: run.oracleType,
       testCases: run.testCases
     });
-    const targetUrl = getSelfHealedTargetUrl(run.targetUrl, encodeSelfHealPlan(selfHealPlan));
+    const targetUrl = getSelfHealedDemoAccountSettingsTargetUrl(request.url, encodeSelfHealPlan(selfHealPlan));
     const newRun = await prisma.run.create({
       data: {
         name: `Self-healed: ${run.name}`,
@@ -86,17 +87,4 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       { status: 201 }
     );
   });
-}
-
-function getSelfHealedTargetUrl(targetUrl: string, encodedPlan: string) {
-  try {
-    const url = new URL(targetUrl);
-    url.pathname = "/demo-app/account-settings";
-    url.search = "";
-    url.searchParams.set("heal", encodedPlan);
-    url.hash = "";
-    return url.toString();
-  } catch {
-    return `https://userpersonatestwebsite.vercel.app/demo-app/account-settings?heal=${encodedPlan}`;
-  }
 }

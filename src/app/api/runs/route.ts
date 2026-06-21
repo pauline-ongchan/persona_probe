@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { OracleType, RunMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { scoreTestCase } from "@/lib/ranking/scoreTestCase";
+import { getDemoAccountSettingsTargetUrl, isLocalhostTarget } from "@/lib/runs/demoTarget";
 import { withSentrySpan } from "@/lib/sentry/withSentrySpan";
 
 const oracleTypes = new Set(["URL_CONTAINS", "TEXT_CONTAINS", "SELECTOR_EXISTS", "LLM_JUDGE"]);
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
     const mode = (runModes.has(String(body.mode)) ? String(body.mode) : "REAL_WEBSITE") as RunMode;
     const isDemoMode = mode === "DEMO_SAFE";
     const requestedTargetUrl = String(body.targetUrl || "").trim();
-    const targetUrl = requestedTargetUrl || (isDemoMode ? getDemoTargetUrl() : "");
+    const targetUrl = isDemoMode ? getDemoAccountSettingsTargetUrl(request.url) : requestedTargetUrl;
     const taskGoal = isDemoMode ? DEMO_TASK : String(body.taskGoal || "").trim();
     const oracleType = (isDemoMode ? DEMO_ORACLE_TYPE : String(body.oracleType || "TEXT_CONTAINS")) as OracleType;
     const oracleValue = isDemoMode ? DEMO_ORACLE_VALUE : String(body.oracleValue || "").trim();
@@ -100,24 +101,4 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ run }, { status: 201 });
   });
-}
-
-function isLocalhostTarget(url: URL) {
-  return ["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(url.hostname);
-}
-
-function getDemoTargetUrl() {
-  if (process.env.NEXT_PUBLIC_DEMO_BASE_URL) {
-    return `${process.env.NEXT_PUBLIC_DEMO_BASE_URL.replace(/\/$/, "")}/demo-app/account-settings`;
-  }
-
-  if (process.env.FLOWPROOF_APP_URL) {
-    return `${process.env.FLOWPROOF_APP_URL.replace(/\/$/, "")}/demo-app/account-settings`;
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}/demo-app/account-settings`;
-  }
-
-  return "https://userpersonatestwebsite.vercel.app/demo-app/account-settings";
 }

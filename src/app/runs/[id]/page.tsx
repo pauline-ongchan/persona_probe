@@ -453,7 +453,7 @@ function explainFailure(
   expected: string
 ) {
   if (isMissingDemoModalControl(reason.toLowerCase())) {
-    return "FlowProof expected the built-in sample page with a privacy modal, but this run appears to be pointed at a page without that modal. Create a new sample run after deployment, or set NEXT_PUBLIC_DEMO_BASE_URL to this FlowProof app origin.";
+    return "FlowProof expected the built-in sample page with a privacy modal, but this run was created against a page that does not contain that modal. Create a new sample run after the latest deployment.";
   }
   if (reason && !isGenericOracleFailure(reason, expected)) return reason;
   if (testCase.failureCategory === "INFRA_FAILURE") {
