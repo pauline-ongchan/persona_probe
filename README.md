@@ -30,6 +30,8 @@ FlowProof does not clone or edit target website repositories. When a failed test
 2. Redacts sensitive fields and stores a `FixAttempt`.
 3. Creates a signed fix-context URL.
 4. Dispatches a GitHub Actions workflow in the configured target website repo.
+5. Serves the signed FixContext to GitHub Actions and marks the `FixAttempt` as `CONTEXT_FETCHED`.
+6. Receives the GitHub Actions callback with `PR_OPENED` or `FAILED`, then stores the PR URL or error for the run dashboard.
 
 Required env vars:
 
@@ -66,6 +68,40 @@ Then configure a Project in FlowProof with:
 - GitHub repo
 - base branch
 - workflow file name
+
+The example workflow fetches the signed FixContext, commits a placeholder evidence file at `flowproof-fix-evidence/<fixAttemptId>.md`, opens a draft PR, and calls back to FlowProof with the PR URL. This proves the end-to-end handoff before a real coding agent is wired in.
+
+The target repo workflow needs these permissions:
+
+```yaml
+permissions:
+  contents: write
+  pull-requests: write
+```
+
+## Autofix demo checklist
+
+1. Deploy FlowProof somewhere GitHub Actions can reach and set `FLOWPROOF_APP_URL` to that public origin.
+2. Set `DATABASE_URL`, `DIRECT_URL`, `GITHUB_TOKEN`, and `FIX_CONTEXT_SECRET` in FlowProof.
+3. Add `.github/workflows/flowproof-autofix.yml` to the target repo using `examples/flowproof-autofix.yml`.
+4. Create or choose a FlowProof Project that points at the target repo and workflow file.
+5. Run a probe, open the run detail page, and click **Create Fix PR** on a failed test case.
+6. Watch the failed test case move through `WORKFLOW_TRIGGERED`, `CONTEXT_FETCHED`, and `PR_OPENED`. The dashboard will show the draft PR link after the callback lands.
+
+The FixContext endpoint is `GET /api/fix-context/:id?token=<signed-token>`. The callback endpoint is `POST /api/fix-attempts/:id/callback` with `Authorization: Bearer <signed-token>` and a JSON body like:
+
+```json
+{
+  "status": "PR_OPENED",
+  "prUrl": "https://github.com/owner/repo/pull/123",
+  "githubWorkflowRunId": "1234567890",
+  "evidence": {
+    "branch": "flowproof/autofix-fixAttemptId",
+    "commitSha": "abc123",
+    "workflowRunUrl": "https://github.com/owner/repo/actions/runs/1234567890"
+  }
+}
+```
 
 ## Deployment note
 

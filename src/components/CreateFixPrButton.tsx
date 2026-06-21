@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, GitPullRequestDraft, Loader2, Wrench } from "lucide-react";
 
@@ -26,6 +26,23 @@ export function CreateFixPrButton({
   const [isLoading, setIsLoading] = useState(false);
   const [fixAttempt, setFixAttempt] = useState<FixAttemptSummary | null>(initialFixAttempt || null);
   const [error, setError] = useState<string | null>(initialFixAttempt?.errorMessage || null);
+
+  useEffect(() => {
+    setFixAttempt(initialFixAttempt || null);
+    setError(initialFixAttempt?.errorMessage || null);
+  }, [initialFixAttempt]);
+
+  useEffect(() => {
+    if (!fixAttempt || fixAttempt.prUrl || fixAttempt.status === "FAILED" || fixAttempt.status === "PR_OPENED") {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      router.refresh();
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [fixAttempt, router]);
 
   async function createFixPr() {
     setIsLoading(true);

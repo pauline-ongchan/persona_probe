@@ -116,7 +116,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return NextResponse.json(
         {
           error: errorMessage,
-          fixAttempt: failedAttempt
+          fixAttempt: toFixAttemptSummary(failedAttempt)
         },
         { status: 502 }
       );
@@ -128,14 +128,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
 
     return NextResponse.json({
-      fixAttempt: {
-        id: updatedAttempt.id,
-        status: updatedAttempt.status,
-        prUrl: updatedAttempt.prUrl,
-        errorMessage: updatedAttempt.errorMessage
-      }
+      fixAttempt: toFixAttemptSummary(updatedAttempt)
     });
   });
+}
+
+function toFixAttemptSummary(fixAttempt: {
+  id: string;
+  status: string;
+  prUrl: string | null;
+  errorMessage: string | null;
+}) {
+  return {
+    id: fixAttempt.id,
+    status: fixAttempt.status,
+    prUrl: fixAttempt.prUrl,
+    errorMessage: fixAttempt.errorMessage
+  };
 }
 
 async function safeJson(request: Request): Promise<Record<string, unknown>> {
