@@ -8,6 +8,7 @@ import {
   parseFixAttemptCallbackPayload
 } from "../../src/lib/fix/fixAttemptStatus";
 import { createFixContextToken, verifyFixContextToken } from "../../src/lib/fix/fixContextToken";
+import { normalizePublicAppUrl } from "../../src/lib/fix/publicAppUrl";
 import type { FixContext } from "../../src/lib/fix/types";
 
 const sampleFixContext: FixContext = {
@@ -60,6 +61,19 @@ test("FixContext response includes an authenticated callback contract", () => {
   assert.equal(response.callback.authHeader, "Authorization");
   assert.equal(response.callback.bearerToken, "signed-token");
   assert.deepEqual(response.callback.statusValues, ["CONTEXT_FETCHED", "PR_OPENED", "FAILED"]);
+});
+
+test("public app URL normalization accepts plain hosts and markdown links", () => {
+  assert.equal(normalizePublicAppUrl("persona-probe-6f7d.vercel.app"), "https://persona-probe-6f7d.vercel.app");
+  assert.equal(
+    normalizePublicAppUrl("[persona-probe-6f7d.vercel.app](https://persona-probe-6f7d.vercel.app/)"),
+    "https://persona-probe-6f7d.vercel.app"
+  );
+  assert.equal(
+    normalizePublicAppUrl("https://[persona-probe-6f7d.vercel.app](https://persona-probe-6f7d.vercel.app/)"),
+    "https://persona-probe-6f7d.vercel.app"
+  );
+  assert.equal(normalizePublicAppUrl("ftp://persona-probe.example.com"), null);
 });
 
 test("FixAttempt status transitions do not downgrade completed attempts", () => {

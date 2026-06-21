@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma/client";
+import { getSentryTraceUrl } from "@/lib/sentry/traceUrl";
 import { setSafeTags, withSentrySpan } from "@/lib/sentry/withSentrySpan";
 import type { FixContext } from "./types";
 
@@ -68,7 +69,7 @@ export async function collectFixContext({
       sentry: testCase.sentryTraceId
         ? {
             traceId: testCase.sentryTraceId,
-            eventUrl: getSentryTraceUrl(testCase.sentryTraceId),
+            eventUrl: getSentryTraceUrl(testCase.sentryTraceId, project.sentryOrg),
             tags: {
               run_id: testCase.runId,
               test_case_id: testCase.id,
@@ -129,10 +130,6 @@ function getRouteHint(value: string | null | undefined) {
   } catch {
     return undefined;
   }
-}
-
-function getSentryTraceUrl(traceId: string) {
-  return `https://sentry.io/performance/trace/${traceId}`;
 }
 
 function isObject(value: unknown): value is RawTraceStep {

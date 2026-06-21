@@ -7,6 +7,7 @@ import { SelfHealRunButton } from "@/components/SelfHealRunButton";
 import { StartRunButton } from "@/components/StartRunButton";
 import { prisma } from "@/lib/prisma/client";
 import { formatDuration, formatPercent, getRunAggregates } from "@/lib/runs/aggregates";
+import { getSentryTraceUrl } from "@/lib/sentry/traceUrl";
 
 export default async function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -140,7 +141,10 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
 
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     <ResultLink href={testCase.browserbaseSessionUrl} label="Browserbase" />
-                    <ResultLink href={testCase.sentryTraceId ? getSentryTraceUrl(testCase.sentryTraceId) : null} label="Sentry trace" />
+                    <ResultLink
+                      href={testCase.sentryTraceId ? getSentryTraceUrl(testCase.sentryTraceId, run.project?.sentryOrg) : null}
+                      label="Sentry trace"
+                    />
                     <CreateFixPrButton
                       disabled={!canCreateFix}
                       initialFixAttempt={
@@ -658,10 +662,6 @@ function parseActionTrace(actionTrace: string): TraceStep[] {
   } catch {
     return [];
   }
-}
-
-function getSentryTraceUrl(traceId: string) {
-  return `https://sentry.io/performance/trace/${traceId}`;
 }
 
 function formatRawLogs(rawLogs: string) {
