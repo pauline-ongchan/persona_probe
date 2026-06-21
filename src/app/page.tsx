@@ -1,6 +1,8 @@
 import { RunForm } from "@/components/RunForm";
 import { prisma } from "@/lib/prisma/client";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [personas, projects] = await Promise.all([
     prisma.persona.findMany({

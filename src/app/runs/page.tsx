@@ -3,6 +3,8 @@ import { ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma/client";
 import { getRunAggregates, formatPercent } from "@/lib/runs/aggregates";
 
+export const dynamic = "force-dynamic";
+
 export default async function RunsPage() {
   const runs = await prisma.run.findMany({
     include: {
