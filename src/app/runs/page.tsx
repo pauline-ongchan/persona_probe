@@ -1,20 +1,24 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { DatabaseSetupNotice } from "@/components/DatabaseSetupNotice";
 import { prisma } from "@/lib/prisma/client";
+import { getDatabaseSetupIssue } from "@/lib/prisma/readiness";
 import { getRunAggregates, formatPercent } from "@/lib/runs/aggregates";
 
 export const dynamic = "force-dynamic";
 
 export default async function RunsPage() {
-  const runs = await prisma.run.findMany({
-    include: {
-      testCases: {
-        include: { persona: true }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 20
-  });
+  const databaseData = await loadRunsData();
+
+  if (databaseData.issue) {
+    return (
+      <main className="mx-auto max-w-7xl px-5 py-8">
+        <DatabaseSetupNotice issue={databaseData.issue} />
+      </main>
+    );
+  }
+
+  const { runs } = databaseData;
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8">
@@ -84,4 +88,24 @@ export default async function RunsPage() {
       </div>
     </main>
   );
+}
+
+async function loadRunsData() {
+  try {
+    const runs = await prisma.run.findMany({
+      include: {
+        testCases: {
+          include: { persona: true }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20
+    });
+
+    return { runs, issue: null };
+  } catch (error) {
+    const issue = getDatabaseSetupIssue(error);
+    if (issue) return { runs: [], issue };
+    throw error;
+  }
 }

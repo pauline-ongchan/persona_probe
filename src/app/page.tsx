@@ -1,17 +1,22 @@
+import { DatabaseSetupNotice } from "@/components/DatabaseSetupNotice";
 import { RunForm } from "@/components/RunForm";
 import { prisma } from "@/lib/prisma/client";
+import { getDatabaseSetupIssue } from "@/lib/prisma/readiness";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [personas, projects] = await Promise.all([
-    prisma.persona.findMany({
-      orderBy: [{ riskWeight: "desc" }, { name: "asc" }]
-    }),
-    prisma.project.findMany({
-      orderBy: { createdAt: "desc" }
-    })
-  ]);
+  const databaseData = await loadHomeData();
+
+  if (databaseData.issue) {
+    return (
+      <main className="mx-auto max-w-7xl px-5 py-8">
+        <DatabaseSetupNotice issue={databaseData.issue} />
+      </main>
+    );
+  }
+
+  const { personas, projects } = databaseData;
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8">
@@ -55,4 +60,23 @@ export default async function HomePage() {
       </section>
     </main>
   );
+}
+
+async function loadHomeData() {
+  try {
+    const [personas, projects] = await Promise.all([
+      prisma.persona.findMany({
+        orderBy: [{ riskWeight: "desc" }, { name: "asc" }]
+      }),
+      prisma.project.findMany({
+        orderBy: { createdAt: "desc" }
+      })
+    ]);
+
+    return { personas, projects, issue: null };
+  } catch (error) {
+    const issue = getDatabaseSetupIssue(error);
+    if (issue) return { personas: [], projects: [], issue };
+    throw error;
+  }
 }

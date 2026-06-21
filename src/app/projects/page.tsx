@@ -1,12 +1,22 @@
+import { DatabaseSetupNotice } from "@/components/DatabaseSetupNotice";
 import { ProjectSettingsForm } from "@/components/ProjectSettingsForm";
 import { prisma } from "@/lib/prisma/client";
+import { getDatabaseSetupIssue } from "@/lib/prisma/readiness";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const projects = await prisma.project.findMany({
-    orderBy: { createdAt: "desc" }
-  });
+  const databaseData = await loadProjectsData();
+
+  if (databaseData.issue) {
+    return (
+      <main className="mx-auto max-w-7xl px-5 py-8">
+        <DatabaseSetupNotice issue={databaseData.issue} />
+      </main>
+    );
+  }
+
+  const { projects } = databaseData;
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8">
@@ -32,4 +42,18 @@ export default async function ProjectsPage() {
       />
     </main>
   );
+}
+
+async function loadProjectsData() {
+  try {
+    const projects = await prisma.project.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+
+    return { projects, issue: null };
+  } catch (error) {
+    const issue = getDatabaseSetupIssue(error);
+    if (issue) return { projects: [], issue };
+    throw error;
+  }
 }
